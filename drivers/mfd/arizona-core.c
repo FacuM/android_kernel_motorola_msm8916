@@ -1656,8 +1656,8 @@ int arizona_dev_exit(struct arizona *arizona)
 	arizona_irq_exit(arizona);
 	if (arizona->pdata.reset)
 		gpio_set_value_cansleep(arizona->pdata.reset, 0);
-
-	regulator_bulk_disable(arizona->num_core_supplies,
+	regulator_disable(arizona->dcvdd);
+	regulator_bulk_disable(ARRAY_SIZE(arizona->core_supplies),
 			       arizona->core_supplies);
 	return 0;
 }
