@@ -1305,8 +1305,6 @@ int arizona_dev_init(struct arizona *arizona)
 	switch (reg) {
 	case 0x5102:
 	case 0x5110:
-	case 0x6349:
-	case 0x8997:
 		break;
 	default:
 		dev_err(arizona->dev, "Unknown device ID: %x\n", reg);
@@ -1375,69 +1373,17 @@ int arizona_dev_init(struct arizona *arizona)
 		}
 		apply_patch = wm5102_patch;
 		arizona->rev &= 0x7;
-		revision_char = arizona->rev + 'A';
 		break;
 #endif
-#ifdef CONFIG_MFD_FLORIDA
+#ifdef CONFIG_MFD_WM5110
 	case 0x5110:
-		switch (arizona->type) {
-		case WM8280:
-			if (arizona->rev >= 0x5) {
-				type_name = "WM8281";
-				revision_char = arizona->rev + 60;
-			} else {
-				type_name = "WM8280";
-				revision_char = arizona->rev + 61;
-			}
-			break;
-
-		case WM5110:
-			type_name = "WM5110";
-			revision_char = arizona->rev + 'A';
-			break;
-
-		default:
-			dev_err(arizona->dev, "Florida codec registered as %d\n",
+		type_name = "WM5110";
+		if (arizona->type != WM5110) {
+			dev_err(arizona->dev, "WM5110 registered as %d\n",
 				arizona->type);
-			arizona->type = WM8280;
-			type_name = "Florida";
-			revision_char = arizona->rev + 61;
-			break;
+			arizona->type = WM5110;
 		}
-		apply_patch = florida_patch;
-		break;
-#endif
-#ifdef CONFIG_MFD_WM8997
-	case 0x8997:
-		type_name = "WM8997";
-		revision_char = arizona->rev + 'A';
-		if (arizona->type != WM8997) {
-			dev_err(arizona->dev, "WM8997 registered as %d\n",
-				arizona->type);
-			arizona->type = WM8997;
-		}
-		apply_patch = wm8997_patch;
-		break;
-#endif
-#ifdef CONFIG_MFD_WM8998
-	case 0x6349:
-		switch (arizona->type) {
-		case WM8998:
-			type_name = "WM8998";
-			break;
-
-		case WM1814:
-			type_name = "WM1814";
-			break;
-
-		default:
-			dev_err(arizona->dev,
-				"Unknown Vegas codec registered as WM8998\n");
-			arizona->type = WM8998;
-		}
-
-		apply_patch = wm8998_patch;
-		revision_char = arizona->rev + 'A';
+		apply_patch = wm5110_patch;
 		break;
 #endif
 	default:
@@ -1445,7 +1391,7 @@ int arizona_dev_init(struct arizona *arizona)
 		goto err_reset;
 	}
 
-	dev_info(dev, "%s revision %c\n", type_name, revision_char);
+	dev_info(dev, "%s revision %c\n", type_name, arizona->rev + 'A');
 
 	if (apply_patch) {
 		ret = apply_patch(arizona);
