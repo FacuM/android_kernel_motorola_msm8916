@@ -853,14 +853,22 @@ static void mmc_wait_for_req_done(struct mmc_host *host,
 		cmd = mrq->cmd;
 
 		/*
-		 * If host has timed out waiting for the commands which can be
-		 * HPIed then let the caller handle the timeout error as it may
-		 * want to send the HPI command to bring the card out of
-		 * programming state.
+		 * If host has timed out waiting for the sanitize
+		 * to complete, card might be still in programming state
+		 * so let's try to bring the card out of programming
+		 * state.
 		 */
-		if (cmd->ignore_timeout && cmd->error == -ETIMEDOUT)
-			break;
-
+		if (cmd->sanitize_busy && cmd->error == -ETIMEDOUT) {
+			if (!mmc_interrupt_hpi(host->card)) {
+				pr_warning("%s: %s: Interrupted sanitize\n",
+					   mmc_hostname(host), __func__);
+				cmd->error = 0;
+				break;
+			} else {
+				pr_err("%s: %s: Failed to interrupt sanitize\n",
+				       mmc_hostname(host), __func__);
+			}
+		}
 		if (!cmd->error || !cmd->retries ||
 		    mmc_card_removed(host->card))
 			break;
