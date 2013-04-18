@@ -1364,6 +1364,8 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
 	 */
 	if (mdesc->map_io)
 		mdesc->map_io();
+	else
+		debug_ll_io_init();
 	fill_pmd_gaps();
 
 	if (use_user_accessible_timers()) {
