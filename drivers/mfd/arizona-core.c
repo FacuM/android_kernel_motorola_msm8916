@@ -620,9 +620,7 @@ err:
 static int arizona_runtime_suspend(struct device *dev)
 {
 	struct arizona *arizona = dev_get_drvdata(dev);
-#if 0
 	int ret;
-#endif
 
 	dev_dbg(arizona->dev, "Entering AoD mode\n");
 	/* this is causing the arizona to be reset while FLL
@@ -660,6 +658,19 @@ static int arizona_runtime_suspend(struct device *dev)
 		break;
 	}
 
+	if (arizona->external_dcvdd) {
+		ret = regmap_update_bits(arizona->regmap,
+					 ARIZONA_ISOLATION_CONTROL,
+					 ARIZONA_ISOLATE_DCVDD1,
+					 ARIZONA_ISOLATE_DCVDD1);
+		if (ret != 0) {
+			dev_err(arizona->dev, "Failed to isolate DCVDD: %d\n",
+				ret);
+			return ret;
+		}
+	}
+
+	regulator_disable(arizona->dcvdd);
 	regcache_cache_only(arizona->regmap, true);
 	regcache_mark_dirty(arizona->regmap);
 	regulator_disable(arizona->dcvdd);
@@ -1212,6 +1223,14 @@ int arizona_dev_init(struct arizona *arizona)
 		regmap_write(arizona->regmap, ARIZONA_GPIO1_CTRL + i,
 			     arizona->pdata.gpio_defaults[i]);
 	}
+
+	/*
+	 * LDO1 can only be used to supply DCVDD so if it has no
+	 * consumers then DCVDD is supplied externally.
+	 */
+	if (arizona->pdata.ldo1 &&
+	    arizona->pdata.ldo1->num_consumer_supplies == 0)
+		arizona->external_dcvdd = true;
 
 	pm_runtime_set_autosuspend_delay(arizona->dev, 100);
 	pm_runtime_use_autosuspend(arizona->dev);
