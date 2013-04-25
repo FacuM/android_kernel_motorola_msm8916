@@ -458,6 +458,7 @@ int clockevents_notify(unsigned long reason, void *arg)
 	int cpu, ret = 0;
 
 	raw_spin_lock_irqsave(&clockevents_lock, flags);
+	tick_notify(reason, arg);
 
 	switch (reason) {
 	case CLOCK_EVT_NOTIFY_BROADCAST_ON:
