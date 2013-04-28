@@ -55,13 +55,11 @@ static int f2fs_vm_page_mkwrite(struct vm_area_struct *vma,
 	f2fs_put_dnode(&dn);
 	f2fs_unlock_op(sbi);
 
-	f2fs_balance_fs(sbi, dn.node_changed);
-
 	file_update_time(vma->vm_file);
 	lock_page(page);
-	if (unlikely(page->mapping != inode->i_mapping ||
+	if (page->mapping != inode->i_mapping ||
 			page_offset(page) > i_size_read(inode) ||
-			!PageUptodate(page))) {
+			!PageUptodate(page)) {
 		unlock_page(page);
 		err = -EFAULT;
 		goto out;
@@ -83,17 +81,9 @@ static int f2fs_vm_page_mkwrite(struct vm_area_struct *vma,
 	set_page_dirty(page);
 	SetPageUptodate(page);
 
-	trace_f2fs_vm_page_mkwrite(page, DATA);
 mapped:
 	/* fill the page */
-	f2fs_wait_on_page_writeback(page, DATA);
-
-	/* wait for GCed encrypted page writeback */
-	if (f2fs_encrypted_inode(inode) && S_ISREG(inode->i_mode))
-		f2fs_wait_on_encrypted_page_writeback(sbi, dn.data_blkaddr);
-
-	/* if gced page is attached, don't write to cold segment */
-	clear_cold_data(page);
+	wait_on_page_writeback(page);
 out:
 	sb_end_pagefault(inode->i_sb);
 	f2fs_update_time(sbi, REQ_TIME);
