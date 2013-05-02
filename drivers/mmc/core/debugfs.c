@@ -643,15 +643,13 @@ static int mmc_dbg_card_status_get(void *data, u64 *val)
 	u32		status;
 	int		ret;
 
-	mmc_rpm_hold(card->host, &card->dev);
-	mmc_claim_host(card->host);
+	mmc_get_card(card);
 
 	ret = mmc_send_status(data, &status);
 	if (!ret)
 		*val = status;
 
-	mmc_release_host(card->host);
-	mmc_rpm_release(card->host, &card->dev);
+	mmc_put_card(card);
 
 	return ret;
 }
@@ -678,11 +676,9 @@ static int mmc_ext_csd_open(struct inode *inode, struct file *filp)
 		goto out_free;
 	}
 
-	mmc_rpm_hold(card->host, &card->dev);
-	mmc_claim_host(card->host);
+	mmc_get_card(card);
 	err = mmc_send_ext_csd(card, ext_csd);
-	mmc_release_host(card->host);
-	mmc_rpm_release(card->host, &card->dev);
+	mmc_put_card(card);
 	if (err)
 		goto out_free;
 
