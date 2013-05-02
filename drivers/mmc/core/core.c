@@ -3794,21 +3794,8 @@ int mmc_suspend_host(struct mmc_host *host)
 
 	mmc_bus_get(host);
 	if (host->bus_ops && !host->bus_dead) {
-		/*
-		 * A long response time is not acceptable for device drivers
-		 * when doing suspend. Prevent mmc_claim_host in the suspend
-		 * sequence, to potentially wait "forever" by trying to
-		 * pre-claim the host.
-		 *
-		 * Skip try claim host for SDIO cards, doing so fixes deadlock
-		 * conditions. The function driver suspend may again call into
-		 * SDIO driver within a different context for enabling power
-		 * save mode in the card and hence wait in mmc_claim_host
-		 * causing deadlock.
-		 */
-		if (!(host->card && mmc_card_sdio(host->card)))
-			if (!mmc_try_claim_host(host))
-				err = -EBUSY;
+		if (host->bus_ops->suspend)
+			err = host->bus_ops->suspend(host);
 
 		if (!err) {
 			if (host->bus_ops->suspend) {
@@ -3851,16 +3838,8 @@ int mmc_suspend_host(struct mmc_host *host)
 		mmc_release_host(host);
 	}
 
-	trace_mmc_suspend_host(mmc_hostname(host), err,
-			ktime_to_us(ktime_sub(ktime_get(), start)));
-	return err;
-out:
-	if (!(host->card && mmc_card_sdio(host->card)))
-		mmc_release_host(host);
-
 	return err;
 }
-
 EXPORT_SYMBOL(mmc_suspend_host);
 
 /**
@@ -3926,23 +3905,10 @@ int mmc_pm_notify(struct notifier_block *notify_block,
 	struct mmc_host *host = container_of(
 		notify_block, struct mmc_host, pm_notify);
 	unsigned long flags;
-	int err = 0;
 
 	switch (mode) {
 	case PM_HIBERNATION_PREPARE:
 	case PM_SUSPEND_PREPARE:
-	case PM_RESTORE_PREPARE:
-		if (host->card && mmc_card_mmc(host->card)) {
-			mmc_claim_host(host);
-			err = mmc_stop_bkops(host->card);
-			mmc_release_host(host);
-			if (err) {
-				pr_err("%s: didn't stop bkops\n",
-					mmc_hostname(host));
-				return notifier_from_errno(err);
-			}
-		}
-
 		spin_lock_irqsave(&host->lock, flags);
 		if (mmc_bus_needs_resume(host)) {
 			spin_unlock_irqrestore(&host->lock, flags);
