@@ -522,6 +522,16 @@ config REGULATOR_TPS65132
 	  can be configured separately. Each regulator can be enabled and
           disabled independently through an external pin.
 
+config REGULATOR_TI_ABB
+	bool "TI Adaptive Body Bias on-chip LDO"
+	depends on ARCH_OMAP
+	help
+	  Select this option to support Texas Instruments' on-chip Adaptive Body
+	  Bias (ABB) LDO regulators. It is recommended that this option be
+	  enabled on required TI SoC. Certain Operating Performance Points
+	  on TI SoCs may be unstable without enabling this as it provides
+	  device specific optimized bias to allow/optimize functionality.
+
 config REGULATOR_VEXPRESS
 	tristate "Versatile Express regulators"
 	depends on VEXPRESS_CONFIG
