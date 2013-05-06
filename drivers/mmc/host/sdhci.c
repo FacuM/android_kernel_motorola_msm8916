@@ -67,15 +67,8 @@ static bool sdhci_check_state(struct sdhci_host *);
 #ifdef CONFIG_PM_RUNTIME
 static int sdhci_runtime_pm_get(struct sdhci_host *host);
 static int sdhci_runtime_pm_put(struct sdhci_host *host);
-static void sdhci_dump_rpm_info(struct sdhci_host *host)
-{
-	struct mmc_host *mmc = host->mmc;
-
-	pr_info("%s: rpmstatus[pltfm](runtime-suspend:usage_count:disable_depth)(%d:%d:%d)\n",
-		mmc_hostname(mmc), mmc->parent->power.runtime_status,
-		atomic_read(&mmc->parent->power.usage_count),
-		mmc->parent->power.disable_depth);
-}
+static void sdhci_runtime_pm_bus_on(struct sdhci_host *host);
+static void sdhci_runtime_pm_bus_off(struct sdhci_host *host);
 #else
 static inline int sdhci_runtime_pm_get(struct sdhci_host *host)
 {
@@ -85,7 +78,10 @@ static inline int sdhci_runtime_pm_put(struct sdhci_host *host)
 {
 	return 0;
 }
-static void sdhci_dump_rpm_info(struct sdhci_host *host)
+static void sdhci_runtime_pm_bus_on(struct sdhci_host *host)
+{
+}
+static void sdhci_runtime_pm_bus_off(struct sdhci_host *host)
 {
 }
 #endif
@@ -271,8 +267,12 @@ static void sdhci_reset(struct sdhci_host *host, u8 mask)
 retry_reset:
 	sdhci_writeb(host, mask, SDHCI_SOFTWARE_RESET);
 
-	if (mask & SDHCI_RESET_ALL)
+	if (mask & SDHCI_RESET_ALL) {
 		host->clock = 0;
+		/* Reset-all turns off SD Bus Power */
+		if (host->quirks2 & SDHCI_QUIRK2_CARD_ON_NEEDS_BUS_ON)
+			sdhci_runtime_pm_bus_off(host);
+	}
 
 	/* Wait max 100 ms */
 	timeout = 100000;
@@ -1512,8 +1512,8 @@ static int sdhci_set_power(struct sdhci_host *host, unsigned short power)
 
 	if (pwr == 0) {
 		sdhci_writeb(host, 0, SDHCI_POWER_CONTROL);
-		if (host->ops->check_power_status)
-			host->ops->check_power_status(host, REQ_BUS_OFF);
+		if (host->quirks2 & SDHCI_QUIRK2_CARD_ON_NEEDS_BUS_ON)
+			sdhci_runtime_pm_bus_off(host);
 		return 0;
 	}
 
@@ -1542,6 +1542,9 @@ static int sdhci_set_power(struct sdhci_host *host, unsigned short power)
 	sdhci_writeb(host, pwr, SDHCI_POWER_CONTROL);
 	if (host->ops->check_power_status)
 		host->ops->check_power_status(host, REQ_BUS_ON);
+
+	if (host->quirks2 & SDHCI_QUIRK2_CARD_ON_NEEDS_BUS_ON)
+		sdhci_runtime_pm_bus_on(host);
 
 	/*
 	 * Some controllers need an extra 10ms delay of 10ms before they
@@ -3481,6 +3484,22 @@ static int sdhci_runtime_pm_put(struct sdhci_host *host)
 	} else {
 		return 0;
 	}
+}
+
+static void sdhci_runtime_pm_bus_on(struct sdhci_host *host)
+{
+	if (host->runtime_suspended || host->bus_on)
+		return;
+	host->bus_on = true;
+	pm_runtime_get_noresume(host->mmc->parent);
+}
+
+static void sdhci_runtime_pm_bus_off(struct sdhci_host *host)
+{
+	if (host->runtime_suspended || !host->bus_on)
+		return;
+	host->bus_on = false;
+	pm_runtime_put_noidle(host->mmc->parent);
 }
 
 int sdhci_runtime_suspend_host(struct sdhci_host *host)
