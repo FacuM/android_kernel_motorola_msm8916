@@ -1171,6 +1171,7 @@ struct mesh_config {
  * @sync_method: which synchronization method to use
  * @path_sel_proto: which path selection protocol to use
  * @path_metric: which metric to use
+ * @auth_id: which authentication method this mesh is using
  * @ie: vendor information elements (optional)
  * @ie_len: length of vendor information elements
  * @is_authenticated: this mesh requires authentication
@@ -1189,6 +1190,7 @@ struct mesh_setup {
 	u8 sync_method;
 	u8 path_sel_proto;
 	u8 path_metric;
+	u8 auth_id;
 	const u8 *ie;
 	u8 ie_len;
 	bool is_authenticated;
