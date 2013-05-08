@@ -33,37 +33,7 @@ struct wm_adsp_alg_region {
 	unsigned int alg;
 	int type;
 	unsigned int base;
-	unsigned int offset;
 	size_t len;
-};
-
-struct wm_adsp_buffer_region {
-	unsigned int offset;
-	unsigned int cumulative_size;
-	unsigned int mem_type;
-	unsigned int base_addr;
-};
-
-struct wm_adsp_buffer_region_def {
-	unsigned int mem_type;
-	unsigned int base_offset;
-	unsigned int size_offset;
-};
-
-struct wm_adsp_fw_caps {
-	u32 id;
-	struct snd_codec_desc desc;
-	int num_host_regions;
-	struct wm_adsp_buffer_region_def *host_region_defs;
-};
-
-struct wm_adsp_fw_defs {
-	const char *name;
-	const char *file;
-	const char *binfile;
-	int compr_direction;
-	int num_caps;
-	struct wm_adsp_fw_caps *caps;
 };
 
 struct wm_adsp {
@@ -93,31 +63,9 @@ struct wm_adsp {
 	struct mutex ctl_lock;
 	struct list_head ctl_list;
 
-	u32 host_buf_ptr;
-	u32 host_buf_ptr2;
+	struct regulator *dvfs;
 
-	int max_dsp_read_bytes;
-	u32 dsp_error;
-
-	u32 *raw_capt_buf;
-	struct circ_buf capt_buf;
-	int capt_buf_size;
-
-	u32 *raw_capt_buf2;
-	struct circ_buf capt_buf2;
-
-	u32 capt_watermark;
-	u32 capt_watermark2;
-	struct wm_adsp_buffer_region *host_regions;
-	struct wm_adsp_buffer_region *host_regions2;
-	bool buffer_drain_pending;
-	bool buffer2_drain_pending;
-
-	int num_firmwares;
-	struct wm_adsp_fw_defs *firmwares;
-
-	struct mutex *fw_lock;
-	struct work_struct boot_work;
+	struct wm_coeff *wm_coeff;
 };
 
 #define ADSP2_BUFFER_1			       1
