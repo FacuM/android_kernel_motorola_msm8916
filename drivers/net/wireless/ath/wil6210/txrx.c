@@ -532,7 +532,7 @@ void wil_netif_rx_any(struct sk_buff *skb, struct net_device *ndev)
 
 	skb_orphan(skb);
 
-	rc = napi_gro_receive(&wil->napi_rx, skb);
+	rc = netif_receive_skb(skb);
 
 	if (unlikely(rc == GRO_DROP)) {
 		ndev->stats.rx_dropped++;
@@ -573,7 +573,8 @@ void wil_rx_handle(struct wil6210_priv *wil, int *quota)
 		return;
 	}
 	wil_dbg_txrx(wil, "%s()\n", __func__);
-	while (NULL != (skb = wil_vring_reap_rx(wil, v))) {
+	while ((*quota > 0) && (NULL != (skb = wil_vring_reap_rx(wil, v)))) {
+		(*quota)--;
 
 		if (wil->wdev->iftype == NL80211_IFTYPE_MONITOR) {
 			skb->dev = ndev;
@@ -1097,19 +1098,10 @@ int wil_tx_complete(struct wil6210_priv *wil, int ringid)
 	struct net_device *ndev = wil_to_ndev(wil);
 	struct device *dev = wil_to_dev(wil);
 	struct vring *vring = &wil->vring_tx[ringid];
-	struct vring_tx_data *txdata = &wil->vring_tx_data[ringid];
 	int done = 0;
-	int cid = wil->vring2cid_tid[ringid][0];
-	struct wil_net_stats *stats = &wil->sta[cid].stats;
-	volatile struct vring_tx_desc *_d;
 
 	if (!vring->va) {
 		wil_err(wil, "Tx irq[%d]: vring not initialized\n", ringid);
-		return 0;
-	}
-
-	if (!txdata->enabled) {
-		wil_info(wil, "Tx irq[%d]: vring disabled\n", ringid);
 		return 0;
 	}
 
@@ -1155,6 +1147,12 @@ int wil_tx_complete(struct wil6210_priv *wil, int ringid)
 		} else {
 			dma_unmap_page(dev, pa, dmalen, DMA_TO_DEVICE);
 		}
+		d->dma.addr_low = 0;
+		d->dma.addr_high = 0;
+		d->dma.length = 0;
+		d->dma.status = TX_DMA_STATUS_DU;
+		vring->swtail = wil_vring_next_tail(vring);
+		done++;
 	}
 
 	if (wil_vring_is_empty(vring)) { /* performance monitoring */
@@ -1165,7 +1163,6 @@ int wil_tx_complete(struct wil6210_priv *wil, int ringid)
 	if (wil_vring_avail_tx(vring) > wil_vring_wmark_high(vring)) {
 		wil_dbg_txrx(wil, "netif_tx_wake : ring not full\n");
 		netif_tx_wake_all_queues(wil_to_ndev(wil));
-	}
 
 	return done;
 }
