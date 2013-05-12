@@ -414,7 +414,13 @@ static struct sk_buff *wil_vring_reap_rx(struct wil6210_priv *wil,
 	dma_unmap_single(dev, pa, sz, DMA_FROM_DEVICE);
 	d1 = wil_skb_rxdesc(skb);
 	*d1 = *d;
+	wil_vring_advance_head(vring, 1);
 	dmalen = le16_to_cpu(d1->dma.length);
+	if (dmalen > sz) {
+		wil_err(wil, "Rx size too large: %d bytes!\n", dmalen);
+		kfree(skb);
+		return NULL;
+	}
 	skb_trim(skb, dmalen);
 
 	cid = wil_rxdesc_cid(d);
@@ -424,6 +430,10 @@ static struct sk_buff *wil_vring_reap_rx(struct wil6210_priv *wil,
 	/* use radiotap header only if required */
 	if (ndev->type == ARPHRD_IEEE80211_RADIOTAP)
 		wil_rx_add_radiotap_header(wil, skb);
+
+	wil_dbg_txrx(wil, "Rx[%3d] : %d bytes\n", vring->swhead, d->dma.length);
+	wil_hex_dump_txrx("Rx ", DUMP_PREFIX_NONE, 32, 4,
+			  (const void *)d, sizeof(*d), false);
 
 	/* no extra checks if in sniffer mode */
 	if (ndev->type != ARPHRD_ETHER)
