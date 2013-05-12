@@ -433,9 +433,11 @@ static struct sk_buff *wil_vring_reap_rx(struct wil6210_priv *wil,
 	if (ndev->type == ARPHRD_IEEE80211_RADIOTAP)
 		wil_rx_add_radiotap_header(wil, skb);
 
-	wil_dbg_txrx(wil, "Rx[%3d] : %d bytes\n", vring->swhead, d->dma.length);
+	trace_wil6210_rx(vring->swhead, d1);
+	wil_dbg_txrx(wil, "Rx[%3d] : %d bytes\n", vring->swhead,
+		     d1->dma.length);
 	wil_hex_dump_txrx("Rx ", DUMP_PREFIX_NONE, 32, 4,
-			  (const void *)d, sizeof(*d), false);
+			  (const void *)d1, sizeof(*d1), false);
 
 	/* no extra checks if in sniffer mode */
 	if (ndev->type != ARPHRD_ETHER)
@@ -1128,6 +1130,8 @@ int wil_tx_complete(struct wil6210_priv *wil, int ringid)
 			break;
 
 		dmalen = le16_to_cpu(d->dma.length);
+		trace_wil6210_tx_done(ringid, vring->swtail, dmalen,
+				      d->dma.error);
 		wil_dbg_txrx(wil,
 			     "Tx[%3d] : %d bytes, status 0x%02x err 0x%02x\n",
 			     vring->swtail, dmalen, d->dma.status,

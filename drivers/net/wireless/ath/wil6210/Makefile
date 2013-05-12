@@ -18,4 +18,12 @@ wil6210-$(CONFIG_WIL6210_PLATFORM_MSM) += wil_platform_msm.o
 # for tracing framework to find trace.h
 CFLAGS_trace.o := -I$(src)
 
+wil6210-$(CONFIG_WIL6210_TRACING) += trace.o
+
+ifeq (, $(findstring -W,$(EXTRA_CFLAGS)))
+	subdir-ccflags-y += -Werror
+endif
+# for tracing framework to find trace.h
+CFLAGS_trace.o := -I$(src)
+
 subdir-ccflags-y += -D__CHECK_ENDIAN__

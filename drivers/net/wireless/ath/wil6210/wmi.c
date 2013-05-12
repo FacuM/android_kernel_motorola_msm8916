@@ -23,10 +23,6 @@
 #include "wmi.h"
 #include "trace.h"
 
-static uint max_assoc_sta = 1;
-module_param(max_assoc_sta, uint, S_IRUGO | S_IWUSR);
-MODULE_PARM_DESC(max_assoc_sta, " Max number of stations associated to the AP");
-
 /**
  * WMI event receiving - theory of operations
  *
@@ -254,7 +250,7 @@ static int __wmi_send(struct wil6210_priv *wil, u16 cmdid, void *buf, u16 len)
 	iowrite32(r->head = next_head, wil->csr + HOST_MBOX +
 		  offsetof(struct wil6210_mbox_ctl, tx.head));
 
-	trace_wil6210_wmi_cmd(&cmd.wmi, buf, len);
+	trace_wil6210_wmi_cmd(cmdid, buf, len);
 
 	/* interrupt to FW */
 	iowrite32(SW_INT_MBOX, wil->csr + HOST_SW_INT);
@@ -720,14 +716,9 @@ void wmi_recv_cmd(struct wil6210_priv *wil)
 		/* indicate */
 		if ((hdr.type == WIL_MBOX_HDR_TYPE_WMI) &&
 		    (len >= sizeof(struct wil6210_mbox_hdr_wmi))) {
-			struct wil6210_mbox_hdr_wmi *wmi = &evt->event.wmi;
-			u16 id = le16_to_cpu(wmi->id);
-			u32 tstamp = le32_to_cpu(wmi->timestamp);
-
-			wil_dbg_wmi(wil, "WMI event 0x%04x MID %d @%d msec\n",
-				    id, wmi->mid, tstamp);
-			trace_wil6210_wmi_event(wmi, &wmi[1],
-						len - sizeof(*wmi));
+			u16 id = le16_to_cpu(evt->event.wmi.id);
+			wil_dbg_wmi(wil, "WMI event 0x%04x\n", id);
+			trace_wil6210_wmi_event(id, &evt->event.wmi, len);
 		}
 		wil_hex_dump_wmi("evt ", DUMP_PREFIX_OFFSET, 16, 1,
 				 &evt->event.hdr, sizeof(hdr) + len, true);
