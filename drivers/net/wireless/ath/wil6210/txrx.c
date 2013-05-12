@@ -161,32 +161,34 @@ static void wil_vring_free(struct wil6210_priv *wil, struct vring *vring,
 	}
 
 	while (!wil_vring_is_empty(vring)) {
-		dma_addr_t pa;
 		u16 dmalen;
-		struct wil_ctx *ctx;
-
 		if (tx) {
 			struct vring_tx_desc dd, *d = &dd;
 			volatile struct vring_tx_desc *_d =
 					&vring->va[vring->swtail].tx;
-
-			ctx = &vring->ctx[vring->swtail];
-			*d = *_d;
-			wil_txdesc_unmap(dev, d, ctx);
-			if (ctx->skb)
-				dev_kfree_skb_any(ctx->skb);
+			dma_addr_t pa = d->dma.addr_low |
+					((u64)d->dma.addr_high << 32);
+			struct sk_buff *skb = vring->ctx[vring->swtail];
+			dmalen = le16_to_cpu(d->dma.length);
+			if (skb) {
+				dma_unmap_single(dev, pa, dmalen,
+						 DMA_TO_DEVICE);
+				dev_kfree_skb_any(skb);
+				vring->ctx[vring->swtail] = NULL;
+			} else {
+				dma_unmap_page(dev, pa, dmalen,
+					       DMA_TO_DEVICE);
+			}
 			vring->swtail = wil_vring_next_tail(vring);
 		} else { /* rx */
-			struct vring_rx_desc dd, *d = &dd;
-			volatile struct vring_rx_desc *_d =
-					&vring->va[vring->swhead].rx;
-
-			ctx = &vring->ctx[vring->swhead];
-			*d = *_d;
-			pa = wil_desc_addr(&d->dma.addr);
+			volatile struct vring_rx_desc *d =
+					&vring->va[vring->swtail].rx;
+			dma_addr_t pa = d->dma.addr_low |
+					((u64)d->dma.addr_high << 32);
+			struct sk_buff *skb = vring->ctx[vring->swhead];
 			dmalen = le16_to_cpu(d->dma.length);
 			dma_unmap_single(dev, pa, dmalen, DMA_FROM_DEVICE);
-			kfree_skb(ctx->skb);
+			kfree_skb(skb);
 			wil_vring_advance_head(vring, 1);
 		}
 	}
@@ -233,8 +235,7 @@ static int wil_vring_alloc_skb(struct wil6210_priv *wil, struct vring *vring,
 	/* error don't care */
 	d->dma.status = 0; /* BIT(0) should be 0 for HW_OWNED */
 	d->dma.length = cpu_to_le16(sz);
-	*_d = *d;
-	vring->ctx[i].skb = skb;
+	vring->ctx[i] = skb;
 
 	return 0;
 }
@@ -411,24 +412,10 @@ static struct sk_buff *wil_vring_reap_rx(struct wil6210_priv *wil,
 	wil_vring_advance_head(vring, 1);
 
 	dma_unmap_single(dev, pa, sz, DMA_FROM_DEVICE);
-	dmalen = le16_to_cpu(d->dma.length);
-
-	trace_wil6210_rx(vring->swhead, d);
-	wil_dbg_txrx(wil, "Rx[%3d] : %d bytes\n", vring->swhead, dmalen);
-	wil_hex_dump_txrx("Rx ", DUMP_PREFIX_NONE, 32, 4,
-			  (const void *)d, sizeof(*d), false);
-
-	if (dmalen > sz) {
-		wil_err(wil, "Rx size too large: %d bytes!\n", dmalen);
-		kfree_skb(skb);
-		return NULL;
-	}
+	d1 = wil_skb_rxdesc(skb);
+	*d1 = *d;
+	dmalen = le16_to_cpu(d1->dma.length);
 	skb_trim(skb, dmalen);
-
-	prefetch(skb->data);
-
-	wil_hex_dump_txrx("Rx ", DUMP_PREFIX_OFFSET, 16, 1,
-			  skb->data, skb_headlen(skb), false);
 
 	cid = wil_rxdesc_cid(d);
 	stats = &wil->sta[cid].stats;
@@ -839,7 +826,7 @@ static int wil_tx_desc_map(struct vring_tx_desc *d, dma_addr_t pa, u32 len,
 	d->dma.error = 0;
 	d->dma.status = 0; /* BIT(0) should be 0 for HW_OWNED */
 	d->dma.length = cpu_to_le16((u16)len);
-	d->dma.d0 = (vring_index << DMA_CFG_DESC_TX_0_QID_POS);
+	d->dma.d0 = 0;
 	d->mac.d[0] = 0;
 	d->mac.d[1] = 0;
 	d->mac.d[2] = 0;
@@ -1005,21 +992,19 @@ static int wil_tx_vring(struct wil6210_priv *wil, struct vring *vring,
 	return 0;
  dma_error:
 	/* unmap what we have mapped */
-	nr_frags = f + 1; /* frags mapped + one for skb head */
-	for (f = 0; f < nr_frags; f++) {
-		struct wil_ctx *ctx;
+	/* Note: increment @f to operate with positive index */
+	for (f++; f > 0; f--) {
+		u16 dmalen;
 
 		i = (swhead + f) % vring->size;
-		ctx = &vring->ctx[i];
-		_d = &vring->va[i].tx;
-		*d = *_d;
-		_d->dma.status = TX_DMA_STATUS_DU;
-		wil_txdesc_unmap(dev, d, ctx);
-
-		if (ctx->skb)
-			dev_kfree_skb_any(ctx->skb);
-
-		memset(ctx, 0, sizeof(*ctx));
+		d = &(vring->va[i].tx);
+		d->dma.status = TX_DMA_STATUS_DU;
+		pa = d->dma.addr_low | ((u64)d->dma.addr_high << 32);
+		dmalen = le16_to_cpu(d->dma.length);
+		if (vring->ctx[i])
+			dma_unmap_single(dev, pa, dmalen, DMA_TO_DEVICE);
+		else
+			dma_unmap_page(dev, pa, dmalen, DMA_TO_DEVICE);
 	}
 
 	return -EINVAL;
@@ -1118,64 +1103,42 @@ int wil_tx_complete(struct wil6210_priv *wil, int ringid)
 	wil_dbg_txrx(wil, "%s(%d)\n", __func__, ringid);
 
 	while (!wil_vring_is_empty(vring)) {
-		int new_swtail;
-		struct wil_ctx *ctx = &vring->ctx[vring->swtail];
-		/**
-		 * For the fragmented skb, HW will set DU bit only for the
-		 * last fragment. look for it
-		 */
-		int lf = (vring->swtail + ctx->nr_frags) % vring->size;
-		/* TODO: check we are not past head */
+		volatile struct vring_tx_desc *d1 =
+					      &vring->va[vring->swtail].tx;
+		struct vring_tx_desc dd, *d = &dd;
+		dma_addr_t pa;
+		struct sk_buff *skb;
+		u16 dmalen;
+
+		dd = *d1;
 
 		_d = &vring->va[lf].tx;
 		if (!(_d->dma.status & TX_DMA_STATUS_DU))
 			break;
 
-		new_swtail = (lf + 1) % vring->size;
-		while (vring->swtail != new_swtail) {
-			struct vring_tx_desc dd, *d = &dd;
-			u16 dmalen;
-			struct sk_buff *skb;
+		dmalen = le16_to_cpu(d->dma.length);
+		wil_dbg_txrx(wil,
+			     "Tx[%3d] : %d bytes, status 0x%02x err 0x%02x\n",
+			     vring->swtail, dmalen, d->dma.status,
+			     d->dma.error);
+		wil_hex_dump_txrx("TxC ", DUMP_PREFIX_NONE, 32, 4,
+				  (const void *)d, sizeof(*d), false);
 
-			ctx = &vring->ctx[vring->swtail];
-			skb = ctx->skb;
-			_d = &vring->va[vring->swtail].tx;
-
-			*d = *_d;
-
-			dmalen = le16_to_cpu(d->dma.length);
-			trace_wil6210_tx_done(ringid, vring->swtail, dmalen,
-					      d->dma.error);
-			wil_dbg_txrx(wil,
-				     "Tx[%3d] : %d bytes, status 0x%02x err 0x%02x\n",
-				     vring->swtail, dmalen, d->dma.status,
-				     d->dma.error);
-			wil_hex_dump_txrx("TxC ", DUMP_PREFIX_NONE, 32, 4,
-					  (const void *)d, sizeof(*d), false);
-
-			wil_txdesc_unmap(dev, d, ctx);
-
-			if (skb) {
-				if (d->dma.error == 0) {
-					ndev->stats.tx_packets++;
-					stats->tx_packets++;
-					ndev->stats.tx_bytes += skb->len;
-					stats->tx_bytes += skb->len;
-				} else {
-					ndev->stats.tx_errors++;
-					stats->tx_errors++;
-				}
-
-				dev_kfree_skb_any(skb);
+		pa = d->dma.addr_low | ((u64)d->dma.addr_high << 32);
+		skb = vring->ctx[vring->swtail];
+		if (skb) {
+			if (d->dma.error == 0) {
+				ndev->stats.tx_packets++;
+				ndev->stats.tx_bytes += skb->len;
+			} else {
+				ndev->stats.tx_errors++;
 			}
-			memset(ctx, 0, sizeof(*ctx));
-			/* There is no need to touch HW descriptor:
-			 * - ststus bit TX_DMA_STATUS_DU is set by design,
-			 *   so hardware will not try to process this desc.,
-			 * - rest of descriptor will be initialized on Tx.
-			 */
-			vring->swtail = wil_vring_next_tail(vring);
-			done++;
+
+			dma_unmap_single(dev, pa, dmalen, DMA_TO_DEVICE);
+			dev_kfree_skb_any(skb);
+			vring->ctx[vring->swtail] = NULL;
+		} else {
+			dma_unmap_page(dev, pa, dmalen, DMA_TO_DEVICE);
 		}
 	}
 

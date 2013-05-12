@@ -707,9 +707,26 @@ static int wil_txdesc_debugfs_show(struct seq_file *s, void *data)
 		seq_printf(s, "  SKB = 0x%p\n", skb);
 
 		if (skb) {
-			skb_get(skb);
-			wil_seq_print_skb(s, skb);
-			kfree_skb(skb);
+			unsigned char printbuf[16 * 3 + 2];
+			int i = 0;
+			int len = le16_to_cpu(d->dma.length);
+			void *p = skb->data;
+
+			if (len != skb_headlen(skb)) {
+				seq_printf(s, "!!! len: desc = %d skb = %d\n",
+					   len, skb_headlen(skb));
+				len = min_t(int, len, skb_headlen(skb));
+			}
+
+			seq_printf(s, "    len = %d\n", len);
+
+			while (i < len) {
+				int l = min(len - i, 16);
+				hex_dump_to_buffer(p + i, l, 16, 1, printbuf,
+						   sizeof(printbuf), false);
+				seq_printf(s, "      : %s\n", printbuf);
+				i += l;
+			}
 		}
 		seq_puts(s, "}\n");
 	} else {
