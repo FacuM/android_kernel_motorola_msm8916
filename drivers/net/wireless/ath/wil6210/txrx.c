@@ -423,9 +423,11 @@ static struct sk_buff *wil_vring_reap_rx(struct wil6210_priv *wil,
 	}
 	skb_trim(skb, dmalen);
 
-	cid = wil_rxdesc_cid(d);
-	stats = &wil->sta[cid].stats;
-	stats->last_mcs_rx = wil_rxdesc_mcs(d);
+	wil_hex_dump_txrx("Rx ", DUMP_PREFIX_OFFSET, 16, 1,
+			  skb->data, skb_headlen(skb), false);
+
+
+	wil->stats.last_mcs_rx = wil_rxdesc_mcs(d1);
 
 	/* use radiotap header only if required */
 	if (ndev->type == ARPHRD_IEEE80211_RADIOTAP)
@@ -569,8 +571,7 @@ void wil_rx_handle(struct wil6210_priv *wil, int *quota)
 		return;
 	}
 	wil_dbg_txrx(wil, "%s()\n", __func__);
-	while ((*quota > 0) && (NULL != (skb = wil_vring_reap_rx(wil, v)))) {
-		(*quota)--;
+	while (NULL != (skb = wil_vring_reap_rx(wil, v))) {
 
 		if (wil->wdev->iftype == NL80211_IFTYPE_MONITOR) {
 			skb->dev = ndev;
