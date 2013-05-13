@@ -233,7 +233,6 @@ static int gpio_ir_recv_probe(struct platform_device *pdev)
 	return 0;
 
 err_request_irq:
-	platform_set_drvdata(pdev, NULL);
 	rc_unregister_device(rcdev);
 	rcdev = NULL;
 err_register_rc_device:
@@ -255,7 +254,6 @@ static int gpio_ir_recv_remove(struct platform_device *pdev)
 		pm_qos_remove_request(&gpio_dev->pm_qos_req);
 	}
 	free_irq(gpio_to_irq(gpio_dev->gpio_nr), gpio_dev);
-	platform_set_drvdata(pdev, NULL);
 	rc_unregister_device(gpio_dev->rcdev);
 	gpio_free(gpio_dev->gpio_nr);
 	kfree(gpio_dev);
