@@ -661,11 +661,17 @@ void release_discard_addrs(struct f2fs_sb_info *sbi)
 static void set_prefree_as_free_segments(struct f2fs_sb_info *sbi)
 {
 	struct dirty_seglist_info *dirty_i = DIRTY_I(sbi);
-	unsigned int segno;
+	unsigned int segno = -1;
+	unsigned int total_segs = TOTAL_SEGS(sbi);
 
 	mutex_lock(&dirty_i->seglist_lock);
-	for_each_set_bit(segno, dirty_i->dirty_segmap[PRE], MAIN_SEGS(sbi))
+	while (1) {
+		segno = find_next_bit(dirty_i->dirty_segmap[PRE], total_segs,
+				segno + 1);
+		if (segno >= total_segs)
+			break;
 		__set_test_and_free(sbi, segno);
+	}
 	mutex_unlock(&dirty_i->seglist_lock);
 }
 
@@ -674,29 +680,30 @@ void clear_prefree_segments(struct f2fs_sb_info *sbi, struct cp_control *cpc)
 	struct list_head *head = &(SM_I(sbi)->discard_list);
 	struct discard_entry *entry, *this;
 	struct dirty_seglist_info *dirty_i = DIRTY_I(sbi);
-	unsigned long *prefree_map = dirty_i->dirty_segmap[PRE];
-	unsigned int start = 0, end = -1;
+	unsigned int segno = -1;
+	unsigned int total_segs = TOTAL_SEGS(sbi);
 
 	mutex_lock(&dirty_i->seglist_lock);
 
 	while (1) {
-		int i;
-		start = find_next_bit(prefree_map, MAIN_SEGS(sbi), end + 1);
-		if (start >= MAIN_SEGS(sbi))
+		segno = find_next_bit(dirty_i->dirty_segmap[PRE], total_segs,
+				segno + 1);
+		if (segno >= total_segs)
 			break;
 		end = find_next_zero_bit(prefree_map, MAIN_SEGS(sbi),
 								start + 1);
 
-		for (i = start; i < end; i++)
-			clear_bit(i, prefree_map);
+		if (test_and_clear_bit(segno, dirty_i->dirty_segmap[PRE]))
+			dirty_i->nr_dirty[PRE]--;
 
-		dirty_i->nr_dirty[PRE] -= end - start;
-
-		if (!test_opt(sbi, DISCARD))
-			continue;
-
-		f2fs_issue_discard(sbi, START_BLOCK(sbi, start),
-				(end - start) << sbi->log_blocks_per_seg);
+		/* Let's use trim */
+		if (test_opt(sbi, DISCARD))
+			blkdev_issue_discard(sbi->sb->s_bdev,
+					START_BLOCK(sbi, segno) <<
+					sbi->log_sectors_per_block,
+					1 << (sbi->log_sectors_per_block +
+						sbi->log_blocks_per_seg),
+					GFP_NOFS, 0);
 	}
 	mutex_unlock(&dirty_i->seglist_lock);
 
@@ -906,7 +913,7 @@ static int is_next_segment_free(struct f2fs_sb_info *sbi, int type)
 	unsigned int segno = curseg->segno + 1;
 	struct free_segmap_info *free_i = FREE_I(sbi);
 
-	if (segno < MAIN_SEGS(sbi) && segno % sbi->segs_per_sec)
+	if (segno < TOTAL_SEGS(sbi) && segno % sbi->segs_per_sec)
 		return !test_bit(segno, free_i->free_segmap);
 	return 0;
 }
