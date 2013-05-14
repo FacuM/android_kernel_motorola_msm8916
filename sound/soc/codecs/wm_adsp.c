@@ -1068,7 +1068,8 @@ static int wm_adsp_create_control(struct snd_soc_codec *codec,
 		region_name = "ZM";
 		break;
 	default:
-		return -EINVAL;
+		ret = -EINVAL;
+		goto err_name;
 	}
 
 	snprintf(name, PAGE_SIZE, "DSP%d %s %x",
@@ -1079,7 +1080,7 @@ static int wm_adsp_create_control(struct snd_soc_codec *codec,
 		if (!strcmp(ctl->name, name)) {
 			if (!ctl->enabled)
 				ctl->enabled = 1;
-			return 0;
+			goto found;
 		}
 	}
 
@@ -1119,6 +1120,7 @@ static int wm_adsp_create_control(struct snd_soc_codec *codec,
 	INIT_WORK(&ctl_work->work, wm_adsp_ctl_work);
 	schedule_work(&ctl_work->work);
 
+found:
 	kfree(name);
 
 	return 0;
