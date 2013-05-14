@@ -71,6 +71,15 @@ static int cpu_subsys_offline(struct device *dev)
 	return ret;
 }
 
+static struct attribute *hotplug_cpu_attrs[] = {
+	&dev_attr_online.attr,
+	NULL
+};
+
+static struct attribute_group hotplug_cpu_attr_group = {
+	.attrs = hotplug_cpu_attrs,
+};
+
 void unregister_cpu(struct cpu *cpu)
 {
 	int logical_cpu = cpu->dev.id;
@@ -102,7 +111,6 @@ static ssize_t cpu_release_store(struct device *dev,
 static DEVICE_ATTR(probe, S_IWUSR, NULL, cpu_probe_store);
 static DEVICE_ATTR(release, S_IWUSR, NULL, cpu_release_store);
 #endif /* CONFIG_ARCH_CPU_PROBE_RELEASE */
-
 #endif /* CONFIG_HOTPLUG_CPU */
 
 struct bus_type cpu_subsys = {
@@ -170,122 +178,15 @@ static const struct attribute_group *common_cpu_attr_groups[] = {
 	NULL
 };
 
-#ifdef CONFIG_SCHED_HMP
-static ssize_t show_sched_mostly_idle_load(struct device *dev,
-		 struct device_attribute *attr, char *buf)
-{
-	struct cpu *cpu = container_of(dev, struct cpu, dev);
-	ssize_t rc;
-	int cpunum;
-	int mostly_idle_pct;
-
-	cpunum = cpu->dev.id;
-
-	mostly_idle_pct = sched_get_cpu_mostly_idle_load(cpunum);
-
-	rc = snprintf(buf, PAGE_SIZE-2, "%d\n", mostly_idle_pct);
-
-	return rc;
-}
-
-static ssize_t __ref store_sched_mostly_idle_load(struct device *dev,
-				  struct device_attribute *attr,
-				  const char *buf, size_t count)
-{
-	struct cpu *cpu = container_of(dev, struct cpu, dev);
-	int cpuid = cpu->dev.id;
-	int mostly_idle_load, err;
-
-	err = kstrtoint(strstrip((char *)buf), 0, &mostly_idle_load);
-	if (err)
-		return err;
-
-	err = sched_set_cpu_mostly_idle_load(cpuid, mostly_idle_load);
-	if (err >= 0)
-		err = count;
-
-	return err;
-}
-
-static ssize_t show_sched_mostly_idle_freq(struct device *dev,
-		 struct device_attribute *attr, char *buf)
-{
-	struct cpu *cpu = container_of(dev, struct cpu, dev);
-	ssize_t rc;
-	int cpunum;
-	unsigned int mostly_idle_freq;
-
-	cpunum = cpu->dev.id;
-
-	mostly_idle_freq = sched_get_cpu_mostly_idle_freq(cpunum);
-
-	rc = snprintf(buf, PAGE_SIZE-2, "%d\n", mostly_idle_freq);
-
-	return rc;
-}
-
-static ssize_t __ref store_sched_mostly_idle_freq(struct device *dev,
-				  struct device_attribute *attr,
-				  const char *buf, size_t count)
-{
-	struct cpu *cpu = container_of(dev, struct cpu, dev);
-	int cpuid = cpu->dev.id, err;
-	unsigned int mostly_idle_freq;
-
-	err = kstrtoint(strstrip((char *)buf), 0, &mostly_idle_freq);
-	if (err)
-		return err;
-
-	err = sched_set_cpu_mostly_idle_freq(cpuid, mostly_idle_freq);
-	if (err >= 0)
-		err = count;
-
-	return err;
-}
-
-static ssize_t show_sched_mostly_idle_nr_run(struct device *dev,
-		 struct device_attribute *attr, char *buf)
-{
-	struct cpu *cpu = container_of(dev, struct cpu, dev);
-	ssize_t rc;
-	int cpunum;
-	int mostly_idle_nr_run;
-
-	cpunum = cpu->dev.id;
-
-	mostly_idle_nr_run = sched_get_cpu_mostly_idle_nr_run(cpunum);
-
-	rc = snprintf(buf, PAGE_SIZE-2, "%d\n", mostly_idle_nr_run);
-
-	return rc;
-}
-
-static ssize_t __ref store_sched_mostly_idle_nr_run(struct device *dev,
-				  struct device_attribute *attr,
-				  const char *buf, size_t count)
-{
-	struct cpu *cpu = container_of(dev, struct cpu, dev);
-	int cpuid = cpu->dev.id;
-	int mostly_idle_nr_run, err;
-
-	err = kstrtoint(strstrip((char *)buf), 0, &mostly_idle_nr_run);
-	if (err)
-		return err;
-
-	err = sched_set_cpu_mostly_idle_nr_run(cpuid, mostly_idle_nr_run);
-	if (err >= 0)
-		err = count;
-
-	return err;
-}
-
-static DEVICE_ATTR(sched_mostly_idle_freq, 0664, show_sched_mostly_idle_freq,
-						store_sched_mostly_idle_freq);
-static DEVICE_ATTR(sched_mostly_idle_load, 0664, show_sched_mostly_idle_load,
-						store_sched_mostly_idle_load);
-static DEVICE_ATTR(sched_mostly_idle_nr_run, 0664,
-		show_sched_mostly_idle_nr_run, store_sched_mostly_idle_nr_run);
+static const struct attribute_group *hotplugable_cpu_attr_groups[] = {
+#ifdef CONFIG_KEXEC
+	&crash_note_cpu_attr_group,
 #endif
+#ifdef CONFIG_HOTPLUG_CPU
+	&hotplug_cpu_attr_group,
+#endif
+	NULL
+};
 
 /*
  * Print cpu online, possible, present, and system maps
@@ -442,6 +343,8 @@ int __cpuinit register_cpu(struct cpu *cpu, int num)
 	cpu->dev.bus->uevent = arch_cpu_uevent;
 #endif
 	cpu->dev.groups = common_cpu_attr_groups;
+	if (cpu->hotpluggable)
+		cpu->dev.groups = hotplugable_cpu_attr_groups;
 	error = device_register(&cpu->dev);
 	if (!error)
 		per_cpu(cpu_sys_devices, num) = &cpu->dev;
