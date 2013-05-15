@@ -69,18 +69,27 @@ static struct fsync_inode_entry *get_fsync_inode(struct list_head *head,
 
 static int recover_dentry(struct inode *inode, struct page *ipage)
 {
-	struct f2fs_inode *raw_inode = F2FS_INODE(ipage);
+	struct f2fs_node *raw_node = (struct f2fs_node *)kmap(ipage);
+	struct f2fs_inode *raw_inode = &(raw_node->i);
 	nid_t pino = le32_to_cpu(raw_inode->i_pino);
+	struct qstr name;
 	struct f2fs_dir_entry *de;
 	struct qstr name;
 	struct page *page;
 	struct inode *dir, *einode;
 	int err = 0;
 
-	dir = f2fs_iget(inode->i_sb, pino);
-	if (IS_ERR(dir)) {
-		err = PTR_ERR(dir);
+	if (!is_dent_dnode(ipage))
 		goto out;
+
+	dir = check_dirty_dir_inode(F2FS_SB(inode->i_sb), pino);
+	if (!dir) {
+		dir = f2fs_iget(inode->i_sb, pino);
+		if (IS_ERR(dir)) {
+			err = PTR_ERR(dir);
+			goto out;
+		}
+		set_inode_flag(F2FS_I(dir), FI_DELAY_IPUT);
 	}
 
 	if (file_enc_name(inode)) {
@@ -129,14 +138,6 @@ retry:
 		add_dirty_dir_inode(dir);
 		set_inode_flag(F2FS_I(dir), FI_DELAY_IPUT);
 	}
-
-	goto out;
-
-out_unmap_put:
-	f2fs_dentry_kunmap(dir, page);
-	f2fs_put_page(page, 0);
-out_err:
-	iput(dir);
 out:
 	f2fs_msg(inode->i_sb, KERN_NOTICE,
 			"%s: ino = %x, name = %s, dir = %lx, err = %d",

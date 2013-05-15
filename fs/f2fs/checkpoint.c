@@ -797,6 +797,31 @@ void remove_dirty_inode(struct inode *inode)
 		clear_inode_flag(fi, FI_DELAY_IPUT);
 		iput(inode);
 	}
+out:
+	spin_unlock(&sbi->dir_inode_lock);
+
+	/* Only from the recovery routine */
+	if (is_inode_flag_set(F2FS_I(inode), FI_DELAY_IPUT))
+		iput(inode);
+}
+
+struct inode *check_dirty_dir_inode(struct f2fs_sb_info *sbi, nid_t ino)
+{
+	struct list_head *head = &sbi->dir_inode_list;
+	struct list_head *this;
+	struct inode *inode = NULL;
+
+	spin_lock(&sbi->dir_inode_lock);
+	list_for_each(this, head) {
+		struct dir_inode_entry *entry;
+		entry = list_entry(this, struct dir_inode_entry, list);
+		if (entry->inode->i_ino == ino) {
+			inode = entry->inode;
+			break;
+		}
+	}
+	spin_unlock(&sbi->dir_inode_lock);
+	return inode;
 }
 
 int sync_dirty_inodes(struct f2fs_sb_info *sbi, enum inode_type type)
