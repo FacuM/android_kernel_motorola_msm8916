@@ -224,8 +224,9 @@ static int find_fsync_dnodes(struct f2fs_sb_info *sbi, struct list_head *head)
 
 		entry = get_fsync_inode(head, ino_of_node(page));
 		if (entry) {
-			if (!is_same_inode(entry->inode, page))
-				goto next;
+			if (IS_INODE(page) && is_dent_dnode(page))
+				set_inode_flag(F2FS_I(entry->inode),
+							FI_INC_LINK);
 		} else {
 			if (IS_INODE(page) && is_dent_dnode(page)) {
 				err = recover_inode_page(sbi, page);
