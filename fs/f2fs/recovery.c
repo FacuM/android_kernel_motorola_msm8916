@@ -79,9 +79,6 @@ static int recover_dentry(struct inode *inode, struct page *ipage)
 	struct inode *dir, *einode;
 	int err = 0;
 
-	if (!is_dent_dnode(ipage))
-		goto out;
-
 	dir = check_dirty_dir_inode(F2FS_SB(inode->i_sb), pino);
 	if (!dir) {
 		dir = f2fs_iget(inode->i_sb, pino);
@@ -139,10 +136,10 @@ retry:
 		set_inode_flag(F2FS_I(dir), FI_DELAY_IPUT);
 	}
 out:
-	f2fs_msg(inode->i_sb, KERN_NOTICE,
-			"%s: ino = %x, name = %s, dir = %lx, err = %d",
-			__func__, ino_of_node(ipage), raw_inode->i_name,
-			IS_ERR(dir) ? 0 : dir->i_ino, err);
+	f2fs_msg(inode->i_sb, KERN_NOTICE, "recover_inode and its dentry: "
+			"ino = %x, name = %s, dir = %lx, err = %d",
+			ino_of_node(ipage), raw_inode->i_name, dir->i_ino, err);
+	kunmap(ipage);
 	return err;
 }
 
@@ -165,34 +162,24 @@ static void recover_inode(struct inode *inode, struct page *page)
 	else
 		name = F2FS_INODE(page)->i_name;
 
+	if (!IS_INODE(node_page))
+		return 0;
+
+	inode->i_mode = le16_to_cpu(raw_inode->i_mode);
+	i_size_write(inode, le64_to_cpu(raw_inode->i_size));
+	inode->i_atime.tv_sec = le64_to_cpu(raw_inode->i_mtime);
+	inode->i_ctime.tv_sec = le64_to_cpu(raw_inode->i_ctime);
+	inode->i_mtime.tv_sec = le64_to_cpu(raw_inode->i_mtime);
+	inode->i_atime.tv_nsec = le32_to_cpu(raw_inode->i_mtime_nsec);
+	inode->i_ctime.tv_nsec = le32_to_cpu(raw_inode->i_ctime_nsec);
+	inode->i_mtime.tv_nsec = le32_to_cpu(raw_inode->i_mtime_nsec);
+
+	if (is_dent_dnode(node_page))
+		return recover_dentry(node_page, inode);
+
 	f2fs_msg(inode->i_sb, KERN_NOTICE, "recover_inode: ino = %x, name = %s",
-			ino_of_node(page), name);
-}
-
-static bool is_same_inode(struct inode *inode, struct page *ipage)
-{
-	struct f2fs_inode *ri = F2FS_INODE(ipage);
-	struct timespec disk;
-
-	if (!IS_INODE(ipage))
-		return true;
-
-	disk.tv_sec = le64_to_cpu(ri->i_ctime);
-	disk.tv_nsec = le32_to_cpu(ri->i_ctime_nsec);
-	if (timespec_compare(&inode->i_ctime, &disk) > 0)
-		return false;
-
-	disk.tv_sec = le64_to_cpu(ri->i_atime);
-	disk.tv_nsec = le32_to_cpu(ri->i_atime_nsec);
-	if (timespec_compare(&inode->i_atime, &disk) > 0)
-		return false;
-
-	disk.tv_sec = le64_to_cpu(ri->i_mtime);
-	disk.tv_nsec = le32_to_cpu(ri->i_mtime_nsec);
-	if (timespec_compare(&inode->i_mtime, &disk) > 0)
-		return false;
-
-	return true;
+			ino_of_node(node_page), raw_inode->i_name);
+	return 0;
 }
 
 static int find_fsync_dnodes(struct f2fs_sb_info *sbi, struct list_head *head)
@@ -249,21 +236,12 @@ static int find_fsync_dnodes(struct f2fs_sb_info *sbi, struct list_head *head)
 			if (IS_ERR(entry->inode)) {
 				err = PTR_ERR(entry->inode);
 				kmem_cache_free(fsync_entry_slab, entry);
-				if (err == -ENOENT) {
-					err = 0;
-					goto next;
-				}
 				break;
 			}
 			list_add_tail(&entry->list, head);
 		}
 		entry->blkaddr = blkaddr;
 
-		if (IS_INODE(page)) {
-			entry->last_inode = blkaddr;
-			if (is_dent_dnode(page))
-				entry->last_dentry = blkaddr;
-		}
 next:
 		/* check next segment */
 		blkaddr = next_blkaddr_of_node(page);
@@ -271,7 +249,9 @@ next:
 
 		ra_meta_pages_cond(sbi, blkaddr);
 	}
-	f2fs_put_page(page, 1);
+	unlock_page(page);
+out:
+	__free_pages(page, 0);
 	return err;
 }
 
@@ -393,18 +373,7 @@ static int do_recover_data(struct f2fs_sb_info *sbi, struct inode *inode,
 	struct dnode_of_data dn;
 	struct node_info ni;
 	int err = 0, recovered = 0;
-
-	/* step 1: recover xattr */
-	if (IS_INODE(page)) {
-		recover_inline_xattr(inode, page);
-	} else if (f2fs_has_xattr_block(ofs_of_node(page))) {
-		/*
-		 * Deprecated; xattr blocks should be found from cold log.
-		 * But, we should remain this for backward compatibility.
-		 */
-		recover_xattr_data(inode, page, blkaddr);
-		goto out;
-	}
+	int ilock;
 
 	/* step 2: recover inline data */
 	if (recover_inline_data(inode, page))
@@ -468,8 +437,8 @@ static int do_recover_data(struct f2fs_sb_info *sbi, struct inode *inode,
 				goto err;
 
 			/* write dummy data page */
-			f2fs_replace_block(sbi, &dn, src, dest,
-							ni.version, false);
+			recover_data_page(sbi, NULL, &sum, src, dest);
+			update_extent_cache(dest, &dn);
 			recovered++;
 		}
 	}
@@ -483,11 +452,12 @@ static int do_recover_data(struct f2fs_sb_info *sbi, struct inode *inode,
 	set_page_dirty(dn.node_page);
 err:
 	f2fs_put_dnode(&dn);
-out:
-	f2fs_msg(sbi->sb, KERN_NOTICE,
-		"recover_data: ino = %lx, recovered = %d blocks, err = %d",
-		inode->i_ino, recovered, err);
-	return err;
+	mutex_unlock_op(sbi, ilock);
+
+	f2fs_msg(sbi->sb, KERN_NOTICE, "recover_data: ino = %lx, "
+			"recovered_data = %d blocks",
+			inode->i_ino, recovered);
+	return 0;
 }
 
 static int recover_data(struct f2fs_sb_info *sbi, struct list_head *head)
