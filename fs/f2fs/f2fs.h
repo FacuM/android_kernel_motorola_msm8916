@@ -1000,7 +1000,17 @@ static inline void f2fs_lock_op(struct f2fs_sb_info *sbi)
 
 static inline void f2fs_unlock_op(struct f2fs_sb_info *sbi)
 {
-	up_read(&sbi->cp_rwsem);
+	int i;
+
+	for (i = 0; i < NR_GLOBAL_LOCKS; i++) {
+		/*
+		 * This is the only time we take multiple fs_lock[]
+		 * instances; the order is immaterial since we
+		 * always hold cp_mutex, which serializes multiple
+		 * such operations.
+		 */
+		mutex_lock_nest_lock(&sbi->fs_lock[i], &sbi->cp_mutex);
+	}
 }
 
 static inline void f2fs_lock_all(struct f2fs_sb_info *sbi)
