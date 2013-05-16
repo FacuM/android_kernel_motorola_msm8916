@@ -128,3 +128,4 @@ config PCI_MSM
 	help
 	  Enables the PCIe functionality by configures PCIe core on
 	  MSM chipset and by enabling the ARM PCI framework extension.
+source "drivers/pci/host/Kconfig"
