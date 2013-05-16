@@ -379,31 +379,6 @@ static const struct nla_policy nl80211_policy[NL80211_ATTR_MAX+1] = {
 	[NL80211_ATTR_IE_RIC] = { .type = NLA_BINARY,
 				  .len = IEEE80211_MAX_DATA_LEN },
 	[NL80211_ATTR_PEER_AID] = { .type = NLA_U16 },
-	[NL80211_ATTR_STA_SUPPORTED_CHANNELS] = { .type = NLA_BINARY },
-	[NL80211_ATTR_STA_SUPPORTED_OPER_CLASSES] = { .type = NLA_BINARY },
-	[NL80211_ATTR_VENDOR_ID] = { .type = NLA_U32 },
-	[NL80211_ATTR_VENDOR_SUBCMD] = { .type = NLA_U32 },
-	[NL80211_ATTR_VENDOR_DATA] = { .type = NLA_BINARY },
-	[NL80211_ATTR_QOS_MAP] = { .type = NLA_BINARY,
-				   .len = IEEE80211_QOS_MAP_LEN_MAX },
-	[NL80211_ATTR_MAC_HINT] = { .len = ETH_ALEN },
-	[NL80211_ATTR_WIPHY_FREQ_HINT] = { .type = NLA_U32 },
-	[NL80211_ATTR_TDLS_PEER_CAPABILITY] = { .type = NLA_U32 },
-	[NL80211_ATTR_AUTHORIZATION_STATUS] = { .type = NLA_U8 },
-	[NL80211_ATTR_KEY_REPLAY_CTR] = { .type = NLA_BINARY,
-				   .len = NL80211_KEY_REPLAY_CTR_LEN },
-	[NL80211_ATTR_PSK] = { .type = NLA_BINARY,
-				   .len = NL80211_KEY_LEN_PSK },
-	[NL80211_ATTR_OFFLOAD_KEY_MGMT] = { .type = NLA_FLAG },
-	[NL80211_ATTR_KEY_MGMT_OFFLOAD_SUPPORT] = { .type = NLA_U32 },
-	[NL80211_ATTR_KEY_DERIVE_OFFLOAD_SUPPORT] = { .type = NLA_U32 },
-	[NL80211_ATTR_PMK] = { .type = NLA_BINARY,
-				   .len = NL80211_KEY_LEN_PMK },
-	[NL80211_ATTR_PMK_LEN] = { .type = NLA_U32 },
-	[NL80211_ATTR_PTK_KCK] = { .type = NLA_BINARY,
-				   .len = NL80211_KEY_LEN_PTK_KCK },
-	[NL80211_ATTR_PTK_KEK] = { .type = NLA_BINARY,
-				   .len = NL80211_KEY_LEN_PTK_KEK },
 };
 
 /* policy for the key attributes */
@@ -4161,10 +4136,10 @@ static int nl80211_new_station(struct sk_buff *skb, struct genl_info *info)
 	params.listen_interval =
 		nla_get_u16(info->attrs[NL80211_ATTR_STA_LISTEN_INTERVAL]);
 
-	if (info->attrs[NL80211_ATTR_PEER_AID])
-		params.aid = nla_get_u16(info->attrs[NL80211_ATTR_PEER_AID]);
-	else
+	if (info->attrs[NL80211_ATTR_STA_AID])
 		params.aid = nla_get_u16(info->attrs[NL80211_ATTR_STA_AID]);
+	else
+		params.aid = nla_get_u16(info->attrs[NL80211_ATTR_PEER_AID]);
 	if (!params.aid || params.aid > IEEE80211_MAX_AID)
 		return -EINVAL;
 
