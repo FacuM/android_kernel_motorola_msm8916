@@ -60,7 +60,7 @@
 #define ARIZONA_CLK_98MHZ  5
 #define ARIZONA_CLK_147MHZ 6
 
-#define ARIZONA_MAX_DAI  15
+#define ARIZONA_MAX_DAI  6
 #define ARIZONA_MAX_ADSP 4
 
 #define ARIZONA_SLIM1 4
@@ -261,7 +261,6 @@ extern int arizona_set_sysclk(struct snd_soc_codec *codec, int clk_id,
 
 extern const struct snd_soc_dai_ops arizona_dai_ops;
 extern const struct snd_soc_dai_ops arizona_simple_dai_ops;
-extern const struct snd_soc_dai_ops arizona_slim_dai_ops;
 
 #define ARIZONA_FLL_NAME_LEN 20
 

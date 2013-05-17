@@ -2631,6 +2631,12 @@ const struct snd_soc_dai_ops arizona_simple_dai_ops = {
 };
 EXPORT_SYMBOL_GPL(arizona_simple_dai_ops);
 
+int arizona_init_dai(struct arizona_priv *priv, int id)
+{
+	struct arizona_dai_priv *dai_priv = &priv->dai[id];
+
+	dai_priv->clk = ARIZONA_CLK_SYSCLK;
+
 static int arizona_slim_startup(struct snd_pcm_substream *substream,
 				struct snd_soc_dai *dai)
 {
