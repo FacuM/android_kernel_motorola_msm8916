@@ -502,20 +502,11 @@ int get_dnode_of_data(struct dnode_of_data *dn, pgoff_t index, int mode)
 
 	nids[0] = dn->inode->i_ino;
 	npage[0] = dn->inode_page;
-
 	if (!npage[0]) {
 		npage[0] = get_node_page(sbi, nids[0]);
 		if (IS_ERR(npage[0]))
 			return PTR_ERR(npage[0]);
 	}
-
-	/* if inline_data is set, should not report any block indices */
-	if (f2fs_has_inline_data(dn->inode) && index) {
-		err = -ENOENT;
-		f2fs_put_page(npage[0], 1);
-		goto release_out;
-	}
-
 	parent = npage[0];
 	if (level != 0)
 		nids[1] = get_nid(parent, offset[0], true);
