@@ -753,9 +753,9 @@ static int fill_zero(struct inode *inode, pgoff_t index,
 
 	f2fs_balance_fs(sbi, true);
 
-	f2fs_lock_op(sbi);
+	ilock = mutex_lock_op(sbi);
 	page = get_new_data_page(inode, NULL, index, false);
-	f2fs_unlock_op(sbi);
+	mutex_unlock_op(sbi, ilock);
 
 	if (IS_ERR(page))
 		return PTR_ERR(page);

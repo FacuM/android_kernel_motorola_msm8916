@@ -327,12 +327,9 @@ int update_dent_inode(struct inode *inode, struct inode *to,
 {
 	struct page *page;
 
-	if (file_enc_name(to))
-		return 0;
-
-	page = get_node_page(F2FS_I_SB(inode), inode->i_ino);
-	if (IS_ERR(page))
-		return PTR_ERR(page);
+	dentry_page = get_new_data_page(inode, NULL, 0, true);
+	if (IS_ERR(dentry_page))
+		return PTR_ERR(dentry_page);
 
 	init_dent_inode(name, page);
 	f2fs_put_page(page, 1);
@@ -581,10 +578,8 @@ start:
 
 	for (block = bidx; block <= (bidx + nblock - 1); block++) {
 		dentry_page = get_new_data_page(dir, NULL, block, true);
-		if (IS_ERR(dentry_page)) {
-			err = PTR_ERR(dentry_page);
-			goto out;
-		}
+		if (IS_ERR(dentry_page))
+			return PTR_ERR(dentry_page);
 
 		dentry_blk = kmap(dentry_page);
 		bit_pos = room_for_filename(&dentry_blk->dentry_bitmap,

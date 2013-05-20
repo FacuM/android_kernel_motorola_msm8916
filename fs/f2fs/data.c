@@ -426,31 +426,31 @@ repeat:
  * ipage should be released by this function.
  */
 struct page *get_new_data_page(struct inode *inode,
-		struct page *ipage, pgoff_t index, bool new_i_size)
+		struct page *npage, pgoff_t index, bool new_i_size)
 {
 	struct address_space *mapping = inode->i_mapping;
 	struct page *page;
 	struct dnode_of_data dn;
 	int err;
 
-	page = f2fs_grab_cache_page(mapping, index, true);
-	if (!page) {
-		/*
-		 * before exiting, we should make sure ipage will be released
-		 * if any error occur.
-		 */
-		f2fs_put_page(ipage, 1);
-		return ERR_PTR(-ENOMEM);
-	}
-
-	set_new_dnode(&dn, inode, ipage, NULL, 0);
-	err = f2fs_reserve_block(&dn, index);
-	if (err) {
-		f2fs_put_page(page, 1);
+	set_new_dnode(&dn, inode, npage, npage, 0);
+	err = get_dnode_of_data(&dn, index, ALLOC_NODE);
+	if (err)
 		return ERR_PTR(err);
+
+	if (dn.data_blkaddr == NULL_ADDR) {
+		if (reserve_new_block(&dn)) {
+			if (!npage)
+				f2fs_put_dnode(&dn);
+			return ERR_PTR(-ENOSPC);
+		}
 	}
-	if (!ipage)
+	if (!npage)
 		f2fs_put_dnode(&dn);
+repeat:
+	page = grab_cache_page(mapping, index);
+	if (!page)
+		return ERR_PTR(-ENOMEM);
 
 	if (PageUptodate(page))
 		goto got_it;
