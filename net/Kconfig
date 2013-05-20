@@ -283,6 +283,18 @@ config SOCKEV_NLMCAST
 	  user space entities need to be notified of socket events without
 	  having to poll /proc
 
+config NET_FLOW_LIMIT
+	boolean
+	depends on RPS
+	default y
+	---help---
+	  The network stack has to drop packets when a receive processing CPU's
+	  backlog reaches netdev_max_backlog. If a few out of many active flows
+	  generate the vast majority of load, drop their traffic earlier to
+	  maintain capacity for the other flows. This feature provides servers
+	  with many clients some protection against DoS by a single (spoofed)
+	  flow that greatly exceeds average workload.
+
 menu "Network testing"
 
 config NET_PKTGEN
