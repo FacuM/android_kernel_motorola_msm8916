@@ -355,9 +355,22 @@ struct page *find_data_page(struct inode *inode, pgoff_t index)
 		return page;
 	f2fs_put_page(page, 0);
 
-	page = get_read_data_page(inode, index, READ_SYNC, false);
-	if (IS_ERR(page))
-		return page;
+	set_new_dnode(&dn, inode, NULL, NULL, 0);
+	err = get_dnode_of_data(&dn, index, LOOKUP_NODE);
+	if (err)
+		return ERR_PTR(err);
+	f2fs_put_dnode(&dn);
+
+	if (dn.data_blkaddr == NULL_ADDR)
+		return ERR_PTR(-ENOENT);
+
+	/* By fallocate(), there is no cached page, but with NEW_ADDR */
+	if (dn.data_blkaddr == NEW_ADDR)
+		return ERR_PTR(-EINVAL);
+
+	page = grab_cache_page_write_begin(mapping, index, AOP_FLAG_NOFS);
+	if (!page)
+		return ERR_PTR(-ENOMEM);
 
 	if (PageUptodate(page))
 		return page;
@@ -383,7 +396,7 @@ struct page *get_lock_data_page(struct inode *inode, pgoff_t index,
 	int err;
 
 repeat:
-	page = grab_cache_page(mapping, index);
+	page = grab_cache_page_write_begin(mapping, index, AOP_FLAG_NOFS);
 	if (!page)
 		return ERR_PTR(-ENOMEM);
 
