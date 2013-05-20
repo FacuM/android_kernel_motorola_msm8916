@@ -928,7 +928,7 @@ int remove_inode_page(struct inode *inode)
 	return 0;
 }
 
-struct page *new_inode_page(struct inode *inode)
+struct page *new_inode_page(struct inode *inode, const struct qstr *name)
 {
 	struct dnode_of_data dn;
 
@@ -936,7 +936,7 @@ struct page *new_inode_page(struct inode *inode)
 	set_new_dnode(&dn, inode, NULL, NULL, inode->i_ino);
 
 	/* caller should f2fs_put_page(page, 1); */
-	return new_node_page(&dn, 0, NULL);
+	return new_node_page(&dn, 0);
 }
 
 struct page *new_node_page(struct dnode_of_data *dn,

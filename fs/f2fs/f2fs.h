@@ -1731,14 +1731,9 @@ struct f2fs_dir_entry *f2fs_parent_dir(struct inode *, struct page **);
 ino_t f2fs_inode_by_name(struct inode *, struct qstr *);
 void f2fs_set_link(struct inode *, struct f2fs_dir_entry *,
 				struct page *, struct inode *);
-int update_dent_inode(struct inode *, struct inode *, const struct qstr *);
-void f2fs_update_dentry(nid_t ino, umode_t mode, struct f2fs_dentry_ptr *,
-			const struct qstr *, f2fs_hash_t , unsigned int);
-int __f2fs_add_link(struct inode *, const struct qstr *, struct inode *, nid_t,
-			umode_t);
-void f2fs_delete_entry(struct f2fs_dir_entry *, struct page *, struct inode *,
-							struct inode *);
-int f2fs_do_tmpfile(struct inode *, struct inode *);
+int __f2fs_add_link(struct inode *, const struct qstr *, struct inode *);
+void f2fs_delete_entry(struct f2fs_dir_entry *, struct page *, struct inode *);
+int f2fs_make_empty(struct inode *, struct inode *);
 bool f2fs_empty_dir(struct inode *);
 
 static inline int f2fs_add_link(struct dentry *dentry, struct inode *inode)
@@ -1776,8 +1771,8 @@ int truncate_inode_blocks(struct inode *, pgoff_t);
 int truncate_xattr_node(struct inode *, struct page *);
 int wait_on_node_pages_writeback(struct f2fs_sb_info *, nid_t);
 int remove_inode_page(struct inode *);
-struct page *new_inode_page(struct inode *);
-struct page *new_node_page(struct dnode_of_data *, unsigned int, struct page *);
+struct page *new_inode_page(struct inode *, const struct qstr *);
+struct page *new_node_page(struct dnode_of_data *, unsigned int);
 void ra_node_page(struct f2fs_sb_info *, nid_t);
 struct page *get_node_page(struct f2fs_sb_info *, pgoff_t);
 struct page *get_node_page_ra(struct page *, int);
