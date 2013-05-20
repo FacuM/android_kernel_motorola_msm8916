@@ -528,6 +528,7 @@ out:
 	destroy_fsync_dnodes(&inode_list);
 	kmem_cache_destroy(fsync_entry_slab);
 	sbi->por_doing = 0;
-	write_checkpoint(sbi, false);
+	if (!err)
+		write_checkpoint(sbi, false);
 	return err;
 }
