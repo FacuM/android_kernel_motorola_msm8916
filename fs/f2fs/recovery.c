@@ -447,12 +447,8 @@ static int recover_data(struct f2fs_sb_info *sbi, struct list_head *head)
 
 		ra_meta_pages_cond(sbi, blkaddr);
 
-		page = get_tmp_page(sbi, blkaddr);
-
-		if (cp_ver != cpver_of_node(page)) {
-			f2fs_put_page(page, 1);
+		if (cp_ver != cpver_of_node(page))
 			break;
-		}
 
 		entry = get_fsync_inode(head, ino_of_node(page));
 		if (!entry)
@@ -472,10 +468,8 @@ static int recover_data(struct f2fs_sb_info *sbi, struct list_head *head)
 			}
 		}
 		err = do_recover_data(sbi, entry->inode, page, blkaddr);
-		if (err) {
-			f2fs_put_page(page, 1);
+		if (err)
 			break;
-		}
 
 		if (entry->blkaddr == blkaddr) {
 			iput(entry->inode);
@@ -487,6 +481,10 @@ next:
 		blkaddr = next_blkaddr_of_node(page);
 		f2fs_put_page(page, 1);
 	}
+	unlock_page(page);
+out:
+	__free_pages(page, 0);
+
 	if (!err)
 		allocate_new_segments(sbi);
 	return err;
