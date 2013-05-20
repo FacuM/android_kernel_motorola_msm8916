@@ -185,7 +185,7 @@ int f2fs_sync_file(struct file *file, loff_t start, loff_t end, int datasync)
 		.for_reclaim = 0,
 	};
 
-	if (unlikely(f2fs_readonly(inode->i_sb)))
+	if (f2fs_readonly(inode->i_sb))
 		return 0;
 
 	trace_f2fs_sync_file_enter(inode);
