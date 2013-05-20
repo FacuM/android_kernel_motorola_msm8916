@@ -69,11 +69,10 @@ static struct fsync_inode_entry *get_fsync_inode(struct list_head *head,
 
 static int recover_dentry(struct inode *inode, struct page *ipage)
 {
-	struct f2fs_node *raw_node = (struct f2fs_node *)kmap(ipage);
+	void *kaddr = page_address(ipage);
+	struct f2fs_node *raw_node = (struct f2fs_node *)kaddr;
 	struct f2fs_inode *raw_inode = &(raw_node->i);
 	nid_t pino = le32_to_cpu(raw_inode->i_pino);
-	struct qstr name;
-	struct f2fs_dir_entry *de;
 	struct qstr name;
 	struct page *page;
 	struct inode *dir, *einode;
@@ -97,40 +96,9 @@ static int recover_dentry(struct inode *inode, struct page *ipage)
 	name.len = le32_to_cpu(raw_inode->i_namelen);
 	name.name = raw_inode->i_name;
 
-	if (unlikely(name.len > F2FS_NAME_LEN)) {
-		WARN_ON(1);
-		err = -ENAMETOOLONG;
-		goto out_err;
-	}
-retry:
-	de = f2fs_find_entry(dir, &name, &page);
-	if (de && inode->i_ino == le32_to_cpu(de->ino))
-		goto out_unmap_put;
-
-	if (de) {
-		einode = f2fs_iget(inode->i_sb, le32_to_cpu(de->ino));
-		if (IS_ERR(einode)) {
-			WARN_ON(1);
-			err = PTR_ERR(einode);
-			if (err == -ENOENT)
-				err = -EEXIST;
-			goto out_unmap_put;
-		}
-		err = acquire_orphan_inode(F2FS_I_SB(inode));
-		if (err) {
-			iput(einode);
-			goto out_unmap_put;
-		}
-		f2fs_delete_entry(de, page, dir, einode);
-		iput(einode);
-		goto retry;
-	}
-	err = __f2fs_add_link(dir, &name, inode, inode->i_ino, inode->i_mode);
-	if (err)
-		goto out_err;
-
-	if (is_inode_flag_set(F2FS_I(dir), FI_DELAY_IPUT)) {
-		iput(dir);
+	if (f2fs_find_entry(dir, &name, &page)) {
+		kunmap(page);
+		f2fs_put_page(page, 0);
 	} else {
 		add_dirty_dir_inode(dir);
 		set_inode_flag(F2FS_I(dir), FI_DELAY_IPUT);
@@ -139,7 +107,6 @@ out:
 	f2fs_msg(inode->i_sb, KERN_NOTICE, "recover_inode and its dentry: "
 			"ino = %x, name = %s, dir = %lx, err = %d",
 			ino_of_node(ipage), raw_inode->i_name, dir->i_ino, err);
-	kunmap(ipage);
 	return err;
 }
 
