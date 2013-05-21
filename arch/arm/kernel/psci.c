@@ -162,24 +162,14 @@ static int psci_affinity_info(unsigned long target_affinity,
 	int err;
 	u32 fn;
 
-	fn = psci_function_id[PSCI_FN_AFFINITY_INFO];
-	err = invoke_psci_fn(fn, target_affinity, lowest_affinity_level, 0);
-	return err;
-}
-
-static int psci_migrate_info_type(void)
+void __init psci_init(void)
 {
 	int err;
 	u32 fn;
 
-	fn = psci_function_id[PSCI_FN_MIGRATE_INFO_TYPE];
-	err = invoke_psci_fn(fn, 0, 0, 0);
-	return err;
-}
-
-static int get_set_conduit_method(struct device_node *np)
-{
-	const char *method;
+	np = of_find_matching_node(NULL, psci_of_match);
+	if (!np)
+		return;
 
 	pr_info("probing for conduit method from DT.\n");
 
@@ -308,25 +298,5 @@ static int psci_0_1_init(struct device_node *np)
 
 out_put_node:
 	of_node_put(np);
-	return err;
-}
-
-static const struct of_device_id psci_of_match[] __initconst = {
-	{ .compatible = "arm,psci", .data = psci_0_1_init},
-	{ .compatible = "arm,psci-0.2", .data = psci_0_2_init},
-	{},
-};
-
-int __init psci_init(void)
-{
-	struct device_node *np;
-	const struct of_device_id *matched_np;
-	psci_initcall_t init_fn;
-
-	np = of_find_matching_node_and_match(NULL, psci_of_match, &matched_np);
-	if (!np)
-		return -ENODEV;
-
-	init_fn = (psci_initcall_t)matched_np->data;
-	return init_fn(np);
+	return;
 }
