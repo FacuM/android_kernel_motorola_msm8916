@@ -550,8 +550,28 @@ EXPORT_SYMBOL(snd_card_free);
 
 static void snd_card_set_id_no_lock(struct snd_card *card, const char *nid)
 {
-	int i, len, idx_flag = 0, loops = SNDRV_CARDS;
-	const char *spos, *src;
+	char *id = card->id;
+
+	while (*nid && !isalnum(*nid))
+		nid++;
+	if (isdigit(*nid))
+		*id++ = isalpha(*src) ? *src : 'D';
+	while (*nid && (size_t)(id - card->id) < sizeof(card->id) - 1) {
+		if (isalnum(*nid))
+			*id++ = *nid;
+		nid++;
+	}
+	*id = 0;
+}
+
+/* Set card->id from the given string
+ * If the string conflicts with other ids, add a suffix to make it unique.
+ */
+static void snd_card_set_id_no_lock(struct snd_card *card, const char *src,
+				    const char *nid)
+{
+	int len, loops;
+	bool is_default = false;
 	char *id;
 	
 	if (nid == NULL) {
@@ -582,39 +602,23 @@ static void snd_card_set_id_no_lock(struct snd_card *card, const char *nid)
 	if (*id == '\0')
 		strcpy(id, "Default");
 
-	while (1) {
-	      	if (loops-- == 0) {
-			snd_printk(KERN_ERR "unable to set card id (%s)\n", id);
-      			strcpy(card->id, card->proc_root->name);
-      			return;
-      		}
-	      	if (!snd_info_check_reserved_words(id))
-      			goto __change;
-		for (i = 0; i < snd_ecards_limit; i++) {
-			if (snd_cards[i] && !strcmp(snd_cards[i]->id, id))
-				goto __change;
-		}
-		break;
+	len = strlen(id);
+	for (loops = 0; loops < SNDRV_CARDS; loops++) {
+		char *spos;
+		char sfxstr[5]; /* "_012" */
+		int sfxlen;
 
-	      __change:
-		len = strlen(id);
-		if (idx_flag) {
-			if (id[len-1] != '9')
-				id[len-1]++;
-			else
-				id[len-1] = 'A';
-		} else if ((size_t)len <= sizeof(card->id) - 3) {
-			strcat(id, "_1");
-			idx_flag++;
-		} else {
-			spos = id + len - 2;
-			if ((size_t)len <= sizeof(card->id) - 2)
-				spos++;
-			*(char *)spos++ = '_';
-			*(char *)spos++ = '1';
-			*(char *)spos++ = '\0';
-			idx_flag++;
-		}
+		if (card_id_ok(card, id))
+			return; /* OK */
+
+		/* Add _XYZ suffix */
+		sprintf(sfxstr, "_%X", loops + 1);
+		sfxlen = strlen(sfxstr);
+		if (len + sfxlen >= sizeof(card->id))
+			spos = id + sizeof(card->id) - sfxlen - 1;
+		else
+			spos = id + len;
+		strcpy(spos, sfxstr);
 	}
 }
 
