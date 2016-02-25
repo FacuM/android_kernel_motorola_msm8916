@@ -98,7 +98,7 @@ static void __ref hotplug_work_fn(struct work_struct *work)
 
 	if (!hotplug_tuners_ins.force_cpu_up) {
 		if (rq_avg_calc) {
-			rq_avg = (avg_nr_running() * 100) >> FSHIFT;
+
 			/*printk(KERN_ERR "online_cpus[%u], rq_avg[%u]\n", online_cpus, rq_avg);*/
 		}
 
