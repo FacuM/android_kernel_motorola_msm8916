@@ -1135,5 +1135,11 @@ config THUNDERPLUG_CONTROL
  	help
  	  This driver uses powersuspend to take down the cpu cores on a octa core device.
 
+config ALUCARD_HOTPLUG
+	bool "Enable alucard-hotplug cpu hotplug driver"
+	default y
+	help
+	  Alucard-hotplug cpu hotplug driver for ARM SOCs
+
 
 endif
