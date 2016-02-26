@@ -182,13 +182,13 @@ static void od_check_cpu(int cpu, unsigned int load)
 
 		if (!od_tuners->powersave_bias) {
 			__cpufreq_driver_target(policy, freq_next,
-					CPUFREQ_RELATION_C);
+					CPUFREQ_RELATION_L);
 			return;
 		}
 
 		freq_next = od_ops.powersave_bias_target(policy, freq_next,
 					CPUFREQ_RELATION_L);
-		__cpufreq_driver_target(policy, freq_next, CPUFREQ_RELATION_C);
+		__cpufreq_driver_target(policy, freq_next, CPUFREQ_RELATION_L);
 	}
 }
 
@@ -630,3 +630,4 @@ fs_initcall(cpufreq_gov_dbs_init);
 module_init(cpufreq_gov_dbs_init);
 #endif
 module_exit(cpufreq_gov_dbs_exit);
+
