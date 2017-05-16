@@ -60,7 +60,7 @@ void dbs_check_cpu(struct dbs_data *dbs_data, int cpu)
 		sampling_rate = cs_tuners->sampling_rate;
 		ignore_nice = cs_tuners->ignore_nice_load;
 
-	} else if (dbs_data->cdata->governor == GOV_ELEMENTALX) {
+	} if (dbs_data->cdata->governor == GOV_ELEMENTALX) {
 		ignore_nice = ex_tuners->ignore_nice_load;
 	} else {
 		ignore_nice = cs_tuners->ignore_nice_load;
