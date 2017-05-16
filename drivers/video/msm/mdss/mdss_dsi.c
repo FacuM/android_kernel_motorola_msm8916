@@ -1284,9 +1284,6 @@ static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 			rc = mdss_dsi_pre_unblank(pdata);
 		mdss_dsi_get_hw_revision(ctrl_pdata);
 
-		if (ctrl_pdata->refresh_clk_rate)
-			rc = mdss_dsi_clk_refresh(pdata);
-		mdss_dsi_get_hw_revision(ctrl_pdata);
 		lcd_notifier_call_chain(LCD_EVENT_ON_START, NULL);
 
 		if (ctrl_pdata->on_cmds.link_state == DSI_LP_MODE)
@@ -1313,8 +1310,6 @@ static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 		if (ctrl_pdata->off_cmds.link_state == DSI_LP_MODE)
 			rc = mdss_dsi_blank(pdata, power_state);
 		rc = mdss_dsi_off(pdata, power_state);
-		if (!(pdata->panel_info.mipi.always_on))
-			rc = mdss_dsi_off(pdata, power_state);
 		lcd_notifier_call_chain(LCD_EVENT_OFF_END, NULL);
 		break;
 	case MDSS_EVENT_CONT_SPLASH_FINISH:
