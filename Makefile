@@ -1,8 +1,8 @@
 VERSION = 3
 PATCHLEVEL = 10
 SUBLEVEL = 104
-EXTRAVERSION = -3.60
-NAME = It works!
+EXTRAVERSION = -4.00
+NAME = Clocky!
 
 # Added by SQK
 TOP := $(dir $(lastword $(MAKEFILE_LIST)))

@@ -22,10 +22,10 @@
 #include <linux/lcd_notify.h>
 #include <linux/cpufreq.h>
 
-static int suspend_cpu_num = 2, resume_cpu_num = 7;
+static int suspend_cpu_num = 2, resume_cpu_num = 3;
 static int endurance_level = 0;
-static int device_cpus = 8;
-static int core_limit = 8;
+static int device_cpus = 4;
+static int core_limit = 4;
 
 static bool isSuspended = false;
 
