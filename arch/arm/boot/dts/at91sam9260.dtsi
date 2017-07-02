@@ -275,7 +275,7 @@
 						atmel,pins =
 							<AT91_PIOA 10 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PA10 periph B */
 							 AT91_PIOA 11 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PA11 periph B */
-							 AT91_PIOA 24 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PA24 periph B */
+							 AT91_PIOA 22 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PA22 periph B */
 							 AT91_PIOA 25 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PA25 periph B */
 							 AT91_PIOA 26 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PA26 periph B */
 							 AT91_PIOA 27 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PA27 periph B */
@@ -348,14 +348,6 @@
 							<AT91_PIOB 0 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB0 periph A SPI1_MISO pin */
 							 AT91_PIOB 1 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB1 periph A SPI1_MOSI pin */
 							 AT91_PIOB 2 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* PB2 periph A SPI1_SPCK pin */
-					};
-				};
-
-				i2c_gpio0 {
-					pinctrl_i2c_gpio0: i2c_gpio0-0 {
-						atmel,pins =
-							<0 23 0x0 0x3   /* PA23 gpio I2C_SDA pin */
-							 0 24 0x0 0x3>; /* PA24 gpio I2C_SCL pin */
 					};
 				};
 
