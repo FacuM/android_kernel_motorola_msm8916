@@ -670,6 +670,18 @@ static int arizona_runtime_suspend(struct device *dev)
 		}
 	}
 
+	if (arizona->external_dcvdd) {
+		ret = regmap_update_bits(arizona->regmap,
+					 ARIZONA_ISOLATION_CONTROL,
+					 ARIZONA_ISOLATE_DCVDD1,
+					 ARIZONA_ISOLATE_DCVDD1);
+		if (ret != 0) {
+			dev_err(arizona->dev, "Failed to isolate DCVDD: %d\n",
+				ret);
+			return ret;
+		}
+	}
+
 	regulator_disable(arizona->dcvdd);
 	regcache_cache_only(arizona->regmap, true);
 	regcache_mark_dirty(arizona->regmap);
@@ -984,6 +996,8 @@ int arizona_dev_init(struct arizona *arizona)
 	mutex_init(&arizona->clk_lock);
 	mutex_init(&arizona->subsys_max_lock);
 	mutex_init(&arizona->reg_setting_lock);
+
+	arizona_of_get_core_pdata(arizona);
 
 	arizona_of_get_core_pdata(arizona);
 
