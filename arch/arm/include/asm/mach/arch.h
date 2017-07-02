@@ -8,8 +8,6 @@
  * published by the Free Software Foundation.
  */
 
-#include <linux/types.h>
-
 #ifndef __ASSEMBLY__
 #include <linux/reboot.h>
 
@@ -18,10 +16,8 @@ struct pt_regs;
 struct smp_operations;
 #ifdef CONFIG_SMP
 #define smp_ops(ops) (&(ops))
-#define smp_init_ops(ops) (&(ops))
 #else
 #define smp_ops(ops) (struct smp_operations *)NULL
-#define smp_init_ops(ops) (bool (*)(void))NULL
 #endif
 
 struct machine_desc {
@@ -45,9 +41,7 @@ struct machine_desc {
 	unsigned char		reserve_lp2 :1;	/* never has lp2	*/
 	enum reboot_mode	reboot_mode;	/* default restart mode	*/
 	struct smp_operations	*smp;		/* SMP operations	*/
-	bool			(*smp_init)(void);
-	void			(*fixup)(struct tag *, char **,
-					 struct meminfo *);
+	void			(*fixup)(struct tag *, char **);
 	void			(*reserve)(void);/* reserve mem blocks	*/
 	void			(*map_io)(void);/* IO mapping function	*/
 	void			(*init_early)(void);
