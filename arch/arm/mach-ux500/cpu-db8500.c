@@ -276,16 +276,6 @@ static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
 	{},
 };
 
-static struct of_dev_auxdata u8540_auxdata_lookup[] __initdata = {
-	/* Requires DMA bindings. */
-	OF_DEV_AUXDATA("arm,pl011", 0x80120000, "uart0", NULL),
-	OF_DEV_AUXDATA("arm,pl011", 0x80121000, "uart1", NULL),
-	OF_DEV_AUXDATA("arm,pl011", 0x80007000, "uart2", NULL),
-	OF_DEV_AUXDATA("stericsson,db8500-prcmu", 0x80157000, "db8500-prcmu",
-			&db8500_prcmu_pdata),
-	{},
-};
-
 static const struct of_device_id u8500_local_bus_nodes[] = {
 	/* only create devices below soc node */
 	{ .compatible = "stericsson,db8500", },
