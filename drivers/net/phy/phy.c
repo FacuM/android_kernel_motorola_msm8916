@@ -946,6 +946,14 @@ void phy_mac_interrupt(struct phy_device *phydev, int new_link)
 }
 EXPORT_SYMBOL(phy_mac_interrupt);
 
+void phy_mac_interrupt(struct phy_device *phydev, int new_link)
+{
+	cancel_work_sync(&phydev->phy_queue);
+	phydev->link = new_link;
+	schedule_work(&phydev->phy_queue);
+}
+EXPORT_SYMBOL(phy_mac_interrupt);
+
 static inline void mmd_phy_indirect(struct mii_bus *bus, int prtad, int devad,
 				    int addr)
 {
