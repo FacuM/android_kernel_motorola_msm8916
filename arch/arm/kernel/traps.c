@@ -870,5 +870,16 @@ void __init early_trap_init(void *vectors_base)
 	 * memory area. The address is configurable and so a table in the kernel
 	 * image can be used.
 	 */
+	memcpy((void *)(vectors + KERN_SIGRETURN_CODE - CONFIG_VECTORS_BASE),
+	       sigreturn_codes, sizeof(sigreturn_codes));
+
+	flush_icache_range(vectors, vectors + PAGE_SIZE);
+	modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
+#else /* ifndef CONFIG_CPU_V7M */
+	/*
+	 * on V7-M there is no need to copy the vector table to a dedicated
+	 * memory area. The address is configurable and so a table in the kernel
+	 * image can be used.
+	 */
 #endif
 }
