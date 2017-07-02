@@ -170,6 +170,18 @@ static struct attribute_group crash_note_cpu_attr_group = {
 	.attrs = crash_note_cpu_attrs,
 };
 #endif
+	NULL
+};
+
+static const struct attribute_group *hotplugable_cpu_attr_groups[] = {
+#ifdef CONFIG_KEXEC
+	&crash_note_cpu_attr_group,
+#endif
+#ifdef CONFIG_HOTPLUG_CPU
+	&hotplug_cpu_attr_group,
+#endif
+	NULL
+};
 
 static const struct attribute_group *common_cpu_attr_groups[] = {
 #ifdef CONFIG_KEXEC
