@@ -731,18 +731,9 @@ intel_dp_compute_config(struct intel_encoder *encoder,
 
 	/* Walk through all bpp values. Luckily they're all nicely spaced with 2
 	 * bpc in between. */
-	bpp = pipe_config->pipe_bpp;
-
-	/*
-	 * eDP panels are really fickle, try to enfore the bpp the firmware
-	 * recomments. This means we'll up-dither 16bpp framebuffers on
-	 * high-depth panels.
-	 */
-	if (is_edp(intel_dp) && dev_priv->vbt.edp_bpp) {
-		DRM_DEBUG_KMS("forcing bpp for eDP panel to BIOS-provided %i\n",
-			      dev_priv->vbt.edp_bpp);
-		bpp = dev_priv->vbt.edp_bpp;
-	}
+	bpp = min_t(int, 8*3, pipe_config->pipe_bpp);
+	if (is_edp(intel_dp) && dev_priv->vbt.edp_bpp)
+		bpp = min_t(int, bpp, dev_priv->vbt.edp_bpp);
 
 	for (; bpp >= 6*3; bpp -= 2*3) {
 		mode_rate = intel_dp_link_required(target_clock, bpp);
@@ -794,8 +785,11 @@ found:
 			       target_clock, adjusted_mode->clock,
 			       &pipe_config->dp_m_n);
 
+<<<<<<< HEAD
 	pipe_config->pipe_bpp = bpp;
 
+=======
+>>>>>>> e1b73cba13a0cc68dd4f746eced15bd6bb24cda4
 	intel_dp_set_clock(encoder, pipe_config, intel_dp->link_bw);
 
 	return true;
