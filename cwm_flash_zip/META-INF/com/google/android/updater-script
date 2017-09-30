@@ -56,28 +56,6 @@ set_perm(0, 0, 0777, "/tmp/flash_kernel.sh");
 set_perm(0, 0, 0777, "/tmp/flash_kernel_patch.sh");
 set_progress(0.2);
 
-ui_print("Checking if you requested DU patch...");
-if
- file_getprop("/tmp/aroma/menu2.prop","selected") == "1"
-then
- ui_print("Flashing patched boot.img...");
- run_program("/tmp/flash_kernel_patch.sh");
- ui_print("---------------------------");
- ui_print(" WARNING! WARNING! WARNING!");
- ui_print(" This built-in patch comes ");
- ui_print(" unrooted. Root again if   ");
- ui_print(" using systemless root.    ");
- ui_print("---------------------------");
- ui_print("Thanks to SlimROM for their");
- ui_print("useful and up-to-date      ");
- ui_print("ramdisk.                   ");
-endif;
-if
- file_getprop("/tmp/aroma/menu2.prop","selected") == "2"
-then
- ui_print("Not flashing patch...");
-endif;
-
 ui_print("Building and installing boot image...");
 run_program("/tmp/flash_kernel.sh");
 set_progress(0.6);
