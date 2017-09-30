@@ -2,7 +2,7 @@
 # Initializing Rom Information
 #
 ini_set("rom_name",             "SomeFeaK");
-ini_set("rom_version",          "7.05");
+ini_set("rom_version",          "8.00");
 ini_set("rom_author",           "facuarmo");
 ini_set("rom_device",           "harpia");
 ini_set("rom_date",             "Jun, 23 2017");
@@ -94,31 +94,6 @@ agreebox(
   
   #-- Unchecked Alert Message
     "<~terms.confirm>"
-);
-
-###################################################################################################################
-#
-# STEP 5 - SHOW MENUBOX - AROMA INSTALLER DEMO MENU
-#
-menubox(
-  #-- Title
-    "SomeFeaK",
-  
-  #-- Sub Title
-    "Are you using Dirty Unicorns?",
-  
-  #-- Icon
-    "@apps",
-    
-  #-- Will be saved in /tmp/aroma/demo.prop
-    "menu2.prop",
-    
-  #-------------------------+-----------------[ Menubox Items ]-------------------------+---------------#
-  # TITLE                   |  SUBTITLE                                                 |   Item Icons  #
-  #-------------------------+-----------------------------------------------------------+---------------#
-  
-    "Yes",                     "Flash repacked patched boot.img.",          "@default",      #-- selected = 1
-    "No",                      "Continue with normal flash.",               "@default"       #-- selected = 2
 );
 
 ini_set("text_next", "Next");
