@@ -485,6 +485,7 @@ struct mdss_panel_info {
 	struct mipi_panel_info mipi;
 	struct lvds_panel_info lvds;
 	struct edp_panel_info edp;
+	struct mdss_livedisplay_ctx *livedisplay;
 
 	bool blank_progress_notify_enabled;
 	struct panel_param *param[PARAM_ID_NUM];
