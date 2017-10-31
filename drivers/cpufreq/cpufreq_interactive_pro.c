@@ -1399,7 +1399,7 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 #ifndef CONFIG_CPU_FREQ_DEFAULT_GOV_INTERACTIVE
 static
 #endif
-struct cpufreq_governor cpufreq_gov_interactive = {
+struct cpufreq_governor cpufreq_gov_interactive_pro = {
 	.name = "interactive_pro",
 	.governor = cpufreq_governor_interactive,
 	.max_transition_latency = 10000000,
@@ -1443,7 +1443,7 @@ static int __init cpufreq_interactive_init(void)
 	/* NB: wake up so the thread does not look hung to the freezer */
 	wake_up_process(speedchange_task);
 
-	return cpufreq_register_governor(&cpufreq_gov_interactive);
+	return cpufreq_register_governor(&cpufreq_gov_interactive_pro);
 }
 
 #ifdef CONFIG_CPU_FREQ_DEFAULT_GOV_INTERACTIVE
@@ -1454,7 +1454,7 @@ module_init(cpufreq_interactive_init);
 
 static void __exit cpufreq_interactive_exit(void)
 {
-	cpufreq_unregister_governor(&cpufreq_gov_interactive);
+	cpufreq_unregister_governor(&cpufreq_gov_interactive_pro);
 	kthread_stop(speedchange_task);
 	put_task_struct(speedchange_task);
 }
