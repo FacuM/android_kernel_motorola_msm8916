@@ -394,6 +394,7 @@ struct cpufreq_governor {
 			will fallback to performance governor */
 	struct list_head	governor_list;
 	struct module		*owner;
+	int	(*boost_cpu_freq)		(struct cpufreq_policy *policy);
 };
 
 /* Pass a target to the cpufreq driver */
