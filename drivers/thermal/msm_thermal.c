@@ -55,9 +55,9 @@
 #define SENSOR_SCALING_FACTOR 1
 #define CPU_DEVICE "cpu%d"
 
-#define POLLING_DELAY 100
+#define POLLING_DELAY 200
 
-unsigned int temp_threshold = 60;
+unsigned int temp_threshold = 55;
 module_param(temp_threshold, int, 0755);
 
 static struct msm_thermal_data msm_thermal_info;
