@@ -159,7 +159,7 @@ extern unsigned long avg_cpu_nr_running(unsigned int cpu);
 
 static unsigned int calculate_thread_stats(void)
 {
-	unsigned int avg_nr_run = avg_nr_running();
+	unsigned int avg_nr_run = sched_get_nr_running_avg(2,0);
 	unsigned int nr_run;
 	unsigned int threshold_size;
 	unsigned int *current_profile;
