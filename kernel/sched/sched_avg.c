@@ -104,3 +104,4 @@ void sched_update_nr_prod(int cpu, unsigned long nr_running, bool inc)
 	spin_unlock_irqrestore(&per_cpu(nr_lock, cpu), flags);
 }
 EXPORT_SYMBOL(sched_update_nr_prod);
+
