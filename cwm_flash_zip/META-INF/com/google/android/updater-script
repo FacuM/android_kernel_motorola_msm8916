@@ -4,7 +4,7 @@ ui_print(" / __| ___ _ __  ___| __|__ __ _| |/ / ");
 ui_print(" \__ \/ _ \ '  \/ -_) _/ -_) _` | ' <  ");
 ui_print(" |___/\___/_|_|_\___|_|\___\__,_|_|\_\ ");
 ui_print("                                       ");
-ui_print("                  v8.00                ");
+ui_print("                  v9.99                ");
 ui_print("                                       ");
 ui_print("=> It's possible thanks to: ");
 ui_print("- Squid2");
