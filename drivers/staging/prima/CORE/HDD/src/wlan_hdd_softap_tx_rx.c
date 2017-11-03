@@ -96,6 +96,8 @@ extern void hdd_set_wlan_suspend_mode(bool suspend);
 #define HDD_SAP_TX_TIMEOUT_RATELIMIT_BURST    1
 #define HDD_SAP_TX_STALL_SSR_THRESHOLD        5
 #define HDD_SAP_TX_STALL_RECOVERY_THRESHOLD HDD_SAP_TX_STALL_SSR_THRESHOLD - 2
+#define HDD_SAP_TX_STALL_FATAL_EVENT_THRESHOLD    2
+
 
 static DEFINE_RATELIMIT_STATE(hdd_softap_tx_timeout_rs,                 \
                               HDD_SAP_TX_TIMEOUT_RATELIMIT_INTERVAL,    \
@@ -139,17 +141,19 @@ void hdd_softap_traffic_monitor_timeout_handler( void *pUsrData )
    return;
 }
 
-VOS_STATUS hdd_start_trafficMonitor( hdd_adapter_t *pAdapter )
+VOS_STATUS hdd_start_trafficMonitor( hdd_adapter_t *pAdapter, bool re_init)
 {
 
     hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
     VOS_STATUS status = VOS_STATUS_SUCCESS;
 
     ENTER();
-    status = wlan_hdd_validate_context(pHddCtx);
-    if (0 != status)
-    {
-        return status;
+
+    if (!re_init) {
+        status = wlan_hdd_validate_context(pHddCtx);
+        if (-ENODEV == status) {
+            return status;
+        }
     }
 
     if ((pHddCtx->cfg_ini->enableTrafficMonitor) &&
@@ -180,16 +184,18 @@ VOS_STATUS hdd_start_trafficMonitor( hdd_adapter_t *pAdapter )
     return status;
 }
 
-VOS_STATUS hdd_stop_trafficMonitor( hdd_adapter_t *pAdapter )
+VOS_STATUS hdd_stop_trafficMonitor( hdd_adapter_t *pAdapter, bool re_init)
 {
     hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
     VOS_STATUS status = VOS_STATUS_SUCCESS;
 
     ENTER();
-    status = wlan_hdd_validate_context(pHddCtx);
-    if (-ENODEV == status)
-    {
-        return status;
+
+    if (!re_init){
+        status = wlan_hdd_validate_context(pHddCtx);
+        if (-ENODEV == status) {
+            return status;
+        }
     }
 
     if (pHddCtx->traffic_monitor.isInitialized)
@@ -276,6 +282,41 @@ static VOS_STATUS hdd_softap_flush_tx_queues( hdd_adapter_t *pAdapter )
    return status;
 }
 
+/**
+ * hdd_softap_get_connected_sta() -  provide number of connected STA
+ * @pHostapdAdapter: pAdapter for SAP
+ *
+ * This function is invoked for SAP mode to get connected STA.
+ *
+ * Return:  Total number of connected STA to SAP.
+ */
+v_U8_t hdd_softap_get_connected_sta(hdd_adapter_t *pHostapdAdapter)
+{
+    v_U8_t i, sta_ct = 0;
+    v_CONTEXT_t pVosContext = NULL;
+    ptSapContext pSapCtx = NULL;
+
+    pVosContext = (WLAN_HDD_GET_CTX(pHostapdAdapter))->pvosContext;
+    pSapCtx = VOS_GET_SAP_CB(pVosContext);
+    if (pSapCtx == NULL) {
+        VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO,
+                 FL("psapCtx is NULL"));
+        goto error;
+    }
+
+    spin_lock_bh(&pSapCtx->staInfo_lock);
+    // get stations associated with SAP
+    for (i = 0; i < WLAN_MAX_STA_COUNT; i++) {
+        if (pSapCtx->aStaInfo[i].isUsed &&
+                  (!vos_is_macaddr_broadcast(&pSapCtx->aStaInfo[i].macAddrSTA)))
+               sta_ct++;
+    }
+    spin_unlock_bh( &pSapCtx->staInfo_lock );
+
+error:
+    return sta_ct;
+}
+
 /**============================================================================
   @brief __hdd_softap_hard_start_xmit() - Function registered with the Linux OS
   for transmitting packets. There are 2 versions of this function. One that
@@ -318,6 +359,13 @@ int __hdd_softap_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
        return os_status;
    }
 
+   if (pHddCtx == NULL)
+   {
+      VOS_TRACE(VOS_MODULE_ID_HDD_SAP_DATA, VOS_TRACE_LEVEL_ERROR,
+            FL("pHddCtx is NULL"));
+      goto xmit_done;
+   }
+
    pDestMacAddress = (v_MACADDR_t*)skb->data;
    
    ++pAdapter->hdd_stats.hddTxRxStats.txXmitCalled;
@@ -342,7 +390,7 @@ int __hdd_softap_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
    else
    {
       STAId = hdd_sta_id_find_from_mac_addr(pAdapter, pDestMacAddress);
-      if (STAId == HDD_WLAN_INVALID_STA_ID)
+      if (STAId == HDD_WLAN_INVALID_STA_ID || STAId >= WLAN_MAX_STA_COUNT)
       {
          VOS_TRACE( VOS_MODULE_ID_HDD_SAP_DATA, VOS_TRACE_LEVEL_WARN,
                     "%s: Failed to find right station", __func__);
@@ -409,6 +457,8 @@ int __hdd_softap_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
     {
        VOS_TRACE( VOS_MODULE_ID_HDD_SAP_DATA, VOS_TRACE_LEVEL_WARN,
             "%s: station %d ac %d queue over limit %d", __func__, STAId, ac, pktListSize);
+       ++pAdapter->hdd_stats.hddTxRxStats.txXmitBackPressured;
+       ++pAdapter->hdd_stats.hddTxRxStats.txXmitBackPressuredAC[ac];
        pSapCtx->aStaInfo[STAId].txSuspended[ac] = VOS_TRUE;
        netif_stop_subqueue(dev, skb_get_queue_mapping(skb));
        txSuspended = VOS_TRUE;
@@ -736,6 +786,8 @@ void __hdd_softap_tx_timeout(struct net_device *dev)
                 "%s: Cannot recover from Data stall Issue SSR",
                 __func__);
       WLANTL_FatalError();
+      // reset count after issuing the SSR
+      pAdapter->hdd_stats.hddTxRxStats.continuousTxTimeoutCount = 0;
       return;
    }
 
@@ -750,7 +802,15 @@ void __hdd_softap_tx_timeout(struct net_device *dev)
       hdd_wmm_tx_snapshot(pAdapter);
       WLANTL_TLDebugMessage(WLANTL_DEBUG_TX_SNAPSHOT);
    }
-
+   /* Call fatal event if data stall is for
+    * HDD_TX_STALL_FATAL_EVENT_THRESHOLD times
+    */
+   if (HDD_SAP_TX_STALL_FATAL_EVENT_THRESHOLD ==
+       pAdapter->hdd_stats.hddTxRxStats.continuousTxTimeoutCount)
+      vos_fatal_event_logs_req(WLAN_LOG_TYPE_FATAL,
+                   WLAN_LOG_INDICATOR_HOST_DRIVER,
+                   WLAN_LOG_REASON_DATA_STALL,
+                   FALSE, TRUE);
 } 
 
 void hdd_softap_tx_timeout(struct net_device *dev)
@@ -793,7 +853,7 @@ struct net_device_stats* hdd_softap_stats(struct net_device *dev)
   @return         : VOS_STATUS_E_FAILURE if any errors encountered 
                   : VOS_STATUS_SUCCESS otherwise
   ===========================================================================*/
-VOS_STATUS hdd_softap_init_tx_rx( hdd_adapter_t *pAdapter )
+VOS_STATUS hdd_softap_init_tx_rx(hdd_adapter_t *pAdapter, bool re_init)
 {
    VOS_STATUS status = VOS_STATUS_SUCCESS;
    v_SINT_t i = -1;
@@ -845,7 +905,7 @@ VOS_STATUS hdd_softap_init_tx_rx( hdd_adapter_t *pAdapter )
    /* Update the AC weights suitable for SoftAP mode of operation */
    WLANTL_SetACWeights((WLAN_HDD_GET_CTX(pAdapter))->pvosContext, pACWeights);
 
-   if (VOS_STATUS_SUCCESS != hdd_start_trafficMonitor(pAdapter))
+   if (VOS_STATUS_SUCCESS != hdd_start_trafficMonitor(pAdapter, re_init))
    {
        VOS_TRACE( VOS_MODULE_ID_HDD_SAP_DATA, VOS_TRACE_LEVEL_ERROR,
           "%s: failed to start Traffic Monito timer ", __func__ );
@@ -862,11 +922,11 @@ VOS_STATUS hdd_softap_init_tx_rx( hdd_adapter_t *pAdapter )
   @return         : VOS_STATUS_E_FAILURE if any errors encountered 
                   : VOS_STATUS_SUCCESS otherwise
   ===========================================================================*/
-VOS_STATUS hdd_softap_deinit_tx_rx( hdd_adapter_t *pAdapter )
+VOS_STATUS hdd_softap_deinit_tx_rx( hdd_adapter_t *pAdapter, bool re_init)
 {
    VOS_STATUS status = VOS_STATUS_SUCCESS;
 
-   if (VOS_STATUS_SUCCESS != hdd_stop_trafficMonitor(pAdapter))
+   if (VOS_STATUS_SUCCESS != hdd_stop_trafficMonitor(pAdapter, re_init))
    {
        VOS_TRACE( VOS_MODULE_ID_HDD_SAP_DATA, VOS_TRACE_LEVEL_ERROR,
                  "%s: Fail to Stop Traffic Monito timer", __func__ );
@@ -1042,6 +1102,7 @@ VOS_STATUS hdd_softap_deinit_tx_rx_sta ( hdd_adapter_t *pAdapter, v_U8_t STAId )
    status = hdd_sta_id_hash_remove_entry(pAdapter,
                 STAId, &pSapCtx->aStaInfo[STAId].macAddrSTA);
    if (status != VOS_STATUS_SUCCESS) {
+       spin_unlock_bh( &pSapCtx->staInfo_lock );
        VOS_TRACE(VOS_MODULE_ID_HDD_SAP_DATA, VOS_TRACE_LEVEL_ERROR,
                  FL("Not able to remove staid hash %d"), STAId);
        return VOS_STATUS_E_FAILURE;
@@ -1685,6 +1746,13 @@ VOS_STATUS hdd_softap_rx_packet_cbk( v_VOID_t *vosContext,
             VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
                       "SAP RX ARP");
          }
+      }
+
+      if (pHddCtx->rx_wow_dump) {
+         if (!(VOS_PKT_PROTO_TYPE_ARP & proto_type) &&
+             !(VOS_PKT_PROTO_TYPE_EAPOL & proto_type))
+            hdd_log_ip_addr(skb);
+         pHddCtx->rx_wow_dump = false;
       }
 
       if (WLAN_RX_BCMC_STA_ID == pRxMetaInfo->ucDesSTAId)

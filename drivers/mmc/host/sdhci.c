@@ -1457,7 +1457,7 @@ clock_set:
 		}
 		timeout--;
 		spin_unlock_irq(&host->lock);
-		usleep_range(900, 1100);
+		usleep_range(90, 110);
 		spin_lock_irq(&host->lock);
 	}
 

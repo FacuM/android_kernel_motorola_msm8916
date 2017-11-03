@@ -4,6 +4,7 @@
 
 # memneq MUST be built with -Os or -O0 to prevent early-return optimizations
 # that will defeat memneq's actual purpose to prevent timing attacks
+# @anupritaisno1: also drop -Ofast
 CFLAGS_REMOVE_memneq.o := -O1 -O2 -O3 -Ofast
 CFLAGS_memneq.o := -Os
 

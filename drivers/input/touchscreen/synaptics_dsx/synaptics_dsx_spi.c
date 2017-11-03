@@ -120,7 +120,6 @@ static int synaptics_rmi4_spi_read(struct synaptics_rmi4_data *rmi4_data,
 
 	retval = synaptics_rmi4_spi_set_page(rmi4_data, addr);
 	if (retval != PAGE_SELECT_LEN) {
-		mutex_unlock(&rmi4_data->rmi4_io_ctrl_mutex);
 		retval = -EIO;
 		goto exit;
 	}
@@ -140,14 +139,8 @@ static int synaptics_rmi4_spi_read(struct synaptics_rmi4_data *rmi4_data,
 
 	retval = spi_sync(spi, &msg);
 	if (retval == 0) {
-		retval = secure_memcpy(data, length, rxbuf, length, length);
-		if (retval < 0) {
-			dev_err(rmi4_data->pdev->dev.parent,
-					"%s: Failed to copy data\n",
-					__func__);
-		} else {
-			retval = length;
-		}
+		retval = length;
+		memcpy(data, rxbuf, length);
 	} else {
 		dev_err(rmi4_data->pdev->dev.parent,
 				"%s: Failed to complete SPI transfer, error = %d\n",
@@ -198,20 +191,12 @@ static int synaptics_rmi4_spi_write(struct synaptics_rmi4_data *rmi4_data,
 
 	txbuf[0] = (addr >> 8) & ~SPI_READ;
 	txbuf[1] = addr & MASK_8BIT;
-	retval = secure_memcpy(&txbuf[ADDRESS_WORD_LEN],
-			xfer_count - ADDRESS_WORD_LEN, data, length, length);
-	if (retval < 0) {
-		dev_err(rmi4_data->pdev->dev.parent,
-				"%s: Failed to copy data\n",
-				__func__);
-		goto exit;
-	}
+	memcpy(&txbuf[ADDRESS_WORD_LEN], data, length);
 
 	mutex_lock(&rmi4_data->rmi4_io_ctrl_mutex);
 
 	retval = synaptics_rmi4_spi_set_page(rmi4_data, addr);
 	if (retval != PAGE_SELECT_LEN) {
-		mutex_unlock(&rmi4_data->rmi4_io_ctrl_mutex);
 		retval = -EIO;
 		goto exit;
 	}
@@ -327,7 +312,7 @@ static struct spi_driver synaptics_rmi4_spi_driver = {
 		.owner = THIS_MODULE,
 	},
 	.probe = synaptics_rmi4_spi_probe,
-	.remove = synaptics_rmi4_spi_remove,
+	.remove = __devexit_p(synaptics_rmi4_spi_remove),
 };
 
 

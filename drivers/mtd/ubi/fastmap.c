@@ -465,8 +465,9 @@ static int scan_pool(struct ubi_device *ubi, struct ubi_attach_info *ai,
 			dbg_bld("Adding PEB to free: %i", pnum);
 
 			if (err == UBI_IO_FF_BITFLIPS)
-			scrub = 1;
-			add_aeb(ai, free, pnum, ec, scrub);
+				scrub = 1;
+
+			add_aeb(ai, free, pnum, ec, last_erase_time, 0, scrub);
 			continue;
 		} else if (err == 0 || err == UBI_IO_BITFLIPS) {
 			dbg_bld("Found non empty PEB:%i in pool", pnum);
