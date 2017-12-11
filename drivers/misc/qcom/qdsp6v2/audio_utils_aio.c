@@ -832,6 +832,7 @@ static long audio_aio_process_event_req_compat(struct q6audio_aio *audio,
 	long rc;
 	struct msm_audio_event32 usr_evt_32;
 	struct msm_audio_event usr_evt;
+	memset(&usr_evt, 0, sizeof(struct msm_audio_event));
 
 	if (copy_from_user(&usr_evt_32, arg,
 				sizeof(struct msm_audio_event32))) {
@@ -841,6 +842,11 @@ static long audio_aio_process_event_req_compat(struct q6audio_aio *audio,
 	usr_evt.timeout_ms = usr_evt_32.timeout_ms;
 
 	rc = audio_aio_process_event_req_common(audio, &usr_evt);
+	if (rc < 0) {
+		pr_err("%s: audio process event failed, rc = %ld",
+			__func__, rc);
+		return rc;
+	}
 
 	usr_evt_32.event_type = usr_evt.event_type;
 	switch (usr_evt_32.event_type) {
@@ -1021,6 +1027,8 @@ static void audio_aio_async_write(struct q6audio_aio *audio,
 	int rc;
 	struct audio_client *ac;
 	struct audio_aio_write_param param;
+
+	memset(&param, 0, sizeof(param));
 
 	if (!audio || !buf_node) {
 		pr_err("%s NULL pointer audio=[0x%pK], buf_node=[0x%pK]\n",
