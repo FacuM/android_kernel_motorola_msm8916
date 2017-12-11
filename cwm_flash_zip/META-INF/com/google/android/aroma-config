@@ -1,3 +1,6 @@
+# Fix the color swap
+
+ini_set("force_colorspace",     "rgba");
 ##
 # Initializing Rom Information
 #
