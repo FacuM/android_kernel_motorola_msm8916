@@ -2,10 +2,10 @@
 # Initializing Rom Information
 #
 ini_set("rom_name",             "SomeFeaK");
-ini_set("rom_version",          "9.99-1");
+ini_set("rom_version",          "9.99-1-s");
 ini_set("rom_author",           "facuarmo");
 ini_set("rom_device",           "harpia");
-ini_set("rom_date",             "Nov, 3 2017");
+ini_set("rom_date",             "Dec, 11 2017");
 
 
 ##
