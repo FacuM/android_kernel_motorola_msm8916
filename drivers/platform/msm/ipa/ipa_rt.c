@@ -53,7 +53,7 @@ int __ipa_generate_rt_hw_rule_v2(enum ipa_ip_type ip,
 	int pipe_idx;
 
 	if (buf == NULL) {
-		memset(tmp, 0, IPA_RT_FLT_HW_RULE_BUF_SIZE);
+		memset(tmp, 0, IPA_RT_FLT_HW_RULE_BUF_SIZE/4);
 		buf = (u8 *)tmp;
 	}
 
@@ -68,8 +68,15 @@ int __ipa_generate_rt_hw_rule_v2(enum ipa_ip_type ip,
 	rule_hdr->u.hdr.pipe_dest_idx = pipe_idx;
 	rule_hdr->u.hdr.system = !ipa_ctx->hdr_tbl_lcl;
 	if (entry->hdr) {
-		rule_hdr->u.hdr.hdr_offset =
-			entry->hdr->offset_entry->offset >> 2;
+		if (entry->hdr->cookie == IPA_HDR_COOKIE) {
+			rule_hdr->u.hdr.hdr_offset =
+				entry->hdr->offset_entry->offset >> 2;
+		} else {
+			IPAERR("Entry hdr deleted by user = %d cookie = %u\n",
+				entry->hdr->user_deleted, entry->hdr->cookie);
+			WARN_ON(1);
+			rule_hdr->u.hdr.hdr_offset = 0;
+		}
 	} else {
 		rule_hdr->u.hdr.hdr_offset = 0;
 	}
@@ -1293,6 +1300,10 @@ int ipa_get_rt_tbl(struct ipa_ioc_get_rt_tbl *lookup)
 	mutex_lock(&ipa_ctx->lock);
 	entry = __ipa_find_rt_tbl(lookup->ip, lookup->name);
 	if (entry && entry->cookie == IPA_COOKIE) {
+		if (entry->ref_cnt == ((u32)~0U)) {
+			IPAERR("fail: ref count crossed limit\n");
+			goto ret;
+		}
 		entry->ref_cnt++;
 		lookup->hdl = entry->id;
 
@@ -1302,6 +1313,8 @@ int ipa_get_rt_tbl(struct ipa_ioc_get_rt_tbl *lookup)
 
 		result = 0;
 	}
+
+ret:
 	mutex_unlock(&ipa_ctx->lock);
 
 	return result;
